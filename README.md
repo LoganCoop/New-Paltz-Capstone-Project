@@ -19,8 +19,72 @@ My current idea for the student-proposed project will be a LiDAR scanner that I 
 2. **Hardware-Software Integration:** Managing the “logic flow” between physical movement (motors) and data acquisition (sensors) to ensure sub-centimeter accuracy.
 3. **Signal Processing:** Implementing filters to reduce sensor noise and handle “outlier” data points in complex environments.
 4. **Mobility (Stretch Goal):** If time permits, the system will be adapted into a handheld form factor using an IMU (Inertial Measurement Unit) to allow for mobile scanning (SLAM – Simultaneous Localization and Mapping).
+	- A Pi Camera 3 can be used for marker-based localization to reduce drift.
 
 ## Timeline Layout
 - **Phase 1:** Component testing and basic 2D mapping.
-- **Phase 2:** Integration of the 2-axis gimbal and 3D data collection.
+- **Phase 2:** Integration of the Godot visualization and 3D data collection.
 - **Phase 3:** Refinement of the visualization UI and final housing assembly.
+
+## Initial TF-Luna UART Test
+This project includes a small Python script to read TF-Luna frames over UART and print
+distance data for quick sensor validation.
+
+### Wiring Notes (TF-Luna to Raspberry Pi)
+- Connect GND to GND.
+- Connect TF-Luna TX to Pi RX (GPIO 15).
+- Connect TF-Luna RX to Pi TX (GPIO 14).
+- Provide 5V power to the TF-Luna (verify your model's voltage/logic levels in its datasheet).
+
+### Setup
+1. Enable the Pi UART (raspi-config) and reboot.
+2. Install dependencies:
+	- `python -m pip install -r requirements.txt`
+3. Run the reader:
+	- `python tools/tfluna_read.py --port /dev/serial0 --baud 115200`
+
+### Output
+Each line includes a timestamp, distance in cm, signal strength, and temperature in C.
+
+## Initial BNO055 Quaternion Test
+This project includes a small Python script to read BNO055 quaternion output over I2C.
+
+### Wiring Notes (BNO055 to Raspberry Pi)
+- Connect GND to GND.
+- Connect VIN to 3.3V or 5V (check your board's regulator specs).
+- Connect SDA to GPIO 2 (SDA).
+- Connect SCL to GPIO 3 (SCL).
+
+### Setup
+1. Enable I2C on the Pi (raspi-config) and reboot.
+2. Install dependencies:
+	- `python -m pip install -r requirements.txt`
+3. Run the reader:
+	- `python tools/bno055_quat_read.py --address 0x28 --rate 10`
+
+### Output
+Each line includes a timestamp and quaternion components (qw, qx, qy, qz).
+
+## Pi Prep Checklist
+- Update packages and reboot after updates.
+- Enable UART (disable serial console), I2C, and Camera in raspi-config.
+- Install base tools: python3-venv, python3-pip, i2c-tools, libcamera-apps.
+- Add your user to dialout for serial access and log out/in.
+
+## Pi Camera 3 Tests and Marker Localization
+Marker-based localization uses the Pi Camera 3 to detect known visual markers and provide
+absolute reference points, which helps reduce drift compared to IMU-only integration.
+
+### Camera Test
+1. Install camera tools:
+	- `sudo apt install -y python3-picamera2 libcamera-apps`
+2. Run the test capture:
+	- `python tools/camera_test.py --output camera_test.jpg`
+
+### ArUco Marker Demo
+1. Install dependencies:
+	- `sudo apt install -y python3-opencv python3-picamera2`
+2. Run marker detection:
+	- `python tools/aruco_pose_demo.py --rate 10`
+
+

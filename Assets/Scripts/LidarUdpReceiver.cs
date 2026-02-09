@@ -24,12 +24,17 @@ public class LidarUdpReceiver : MonoBehaviour
     public Transform pointPrefab;
     public float scaleMeters = 0.01f;
     public int maxPoints = 5000;
+    public bool debugOverlay = true;
+    public bool ignoreOrientation = false;
 
     private UdpClient _client;
     private Thread _thread;
     private bool _running;
     private readonly object _lock = new object();
     private Packet _latest;
+    private int _packetCount;
+    private long _lastPacketTicks;
+    private string _lastSender;
 
     private Quaternion _calibration = Quaternion.identity;
     private bool _hasCalibration;
@@ -58,6 +63,9 @@ public class LidarUdpReceiver : MonoBehaviour
                 lock (_lock)
                 {
                     _latest = packet;
+                    _packetCount++;
+                    _lastPacketTicks = DateTime.UtcNow.Ticks;
+                    _lastSender = endPoint.ToString();
                 }
             }
             catch (SocketException)
@@ -108,7 +116,7 @@ public class LidarUdpReceiver : MonoBehaviour
             q = _calibration * q;
         }
 
-        var dir = q * Vector3.forward;
+        var dir = ignoreOrientation ? Vector3.forward : (q * Vector3.forward);
         var pos = dir * (current.dist_cm * scaleMeters);
 
         var point = Instantiate(pointPrefab, pos, Quaternion.identity);
@@ -120,14 +128,37 @@ public class LidarUdpReceiver : MonoBehaviour
         }
     }
 
-        bool IsCalibrationPressed()
+    void OnGUI()
+    {
+        if (!debugOverlay) return;
+
+        int count;
+        long ticks;
+        string sender;
+        lock (_lock)
         {
-    #if ENABLE_INPUT_SYSTEM
-        return Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
-    #else
-        return Input.GetKeyDown(KeyCode.Space);
-    #endif
+            count = _packetCount;
+            ticks = _lastPacketTicks;
+            sender = _lastSender;
         }
+
+        string lastSeen = ticks == 0
+            ? "never"
+            : (DateTime.UtcNow - new DateTime(ticks, DateTimeKind.Utc)).TotalSeconds.ToString("0.00") + "s";
+
+        GUI.Label(new Rect(10, 10, 600, 20), "UDP packets: " + count);
+        GUI.Label(new Rect(10, 30, 600, 20), "Last packet: " + lastSeen + " ago");
+        GUI.Label(new Rect(10, 50, 600, 20), "Last sender: " + (sender ?? "n/a"));
+    }
+
+    bool IsCalibrationPressed()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.Space);
+#endif
+    }
 
     void OnDestroy()
     {

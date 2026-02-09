@@ -31,3 +31,8 @@
 ## Notes
 - Plan: I have wired in all parts so now my game plan is to test and calibrate all parts to get some preliminary test data. Then I'll begin working on the housing for all my parts to make it into a handheld device. Then I will work further on the software.
 - Now that all components have been tested and are working I have made a working dev branch where I will develope the software to make 3D maps and create the housing for the full system.
+
+## (2/9/26)
+
+##
+- Plan: I have begon designing and printing the housing for the LiDAR system. While the case is being printed I plan on working on building the bridge of data between the hardware and software. I have chosen to send the readings of the TF-luna and other components to a 3D environment made in Unity.

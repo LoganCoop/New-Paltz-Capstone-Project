@@ -8,7 +8,7 @@ import adafruit_bno055
 
 def main():
     parser = argparse.ArgumentParser(description="Read BNO055 quaternion output over I2C.")
-    parser.add_argument("--address", default="0x28", help="I2C address (hex), default 0x28")
+    parser.add_argument("--address", default="0x29", help="I2C address (hex), default 0x29")
     parser.add_argument("--rate", type=float, default=10.0, help="Output rate in Hz")
     args = parser.parse_args()
 

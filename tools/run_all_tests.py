@@ -93,7 +93,7 @@ def main():
 
     # BNO055 options
     parser.add_argument("--bno", action="store_true", help="Run BNO055 quaternion reader")
-    parser.add_argument("--bno-address", type=lambda x: int(x, 16), default=0x28)
+    parser.add_argument("--bno-address", type=lambda x: int(x, 16), default=0x29)
     parser.add_argument("--bno-rate", type=float, default=10.0)
 
     # Camera / Aruco

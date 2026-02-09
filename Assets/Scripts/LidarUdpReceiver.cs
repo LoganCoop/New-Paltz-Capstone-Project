@@ -4,6 +4,9 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 public class LidarUdpReceiver : MonoBehaviour
 {
@@ -73,7 +76,7 @@ public class LidarUdpReceiver : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (IsCalibrationPressed())
         {
             Packet snapshot;
             lock (_lock)
@@ -116,6 +119,15 @@ public class LidarUdpReceiver : MonoBehaviour
             Destroy(transform.GetChild(0).gameObject);
         }
     }
+
+        bool IsCalibrationPressed()
+        {
+    #if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
+    #else
+        return Input.GetKeyDown(KeyCode.Space);
+    #endif
+        }
 
     void OnDestroy()
     {

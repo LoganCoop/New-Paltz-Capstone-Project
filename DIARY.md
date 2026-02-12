@@ -36,3 +36,15 @@
 
 ##
 - Plan: I have begon designing and printing the housing for the LiDAR system. While the case is being printed I plan on working on building the bridge of data between the hardware and software. I have chosen to send the readings of the TF-luna and other components to a 3D environment made in Unity.
+
+## (2/12/26)
+### What I accomplished
+- Finished Pi Camera 3 testing and calibration.
+- Successfully estimated ArUco marker poses and streamed them to Unity.
+- Updated Unity receiver to handle both sensor and marker pose data.
+- Cleaned up unused folders (libcamera) from git tracking.
+
+### Next Steps
+- Commit and push latest changes.
+- Continue testing marker pose visualization in Unity.
+- Finalize integration and document workflow.

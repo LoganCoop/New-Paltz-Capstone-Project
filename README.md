@@ -87,4 +87,19 @@ absolute reference points, which helps reduce drift compared to IMU-only integra
 2. Run marker detection:
 	- `python tools/aruco_pose_demo.py --rate 10`
 
+---
+
+## Progress Update (2/12/26)
+- Pi Camera 3 tested and working for image capture.
+- Calibration images captured and camera calibration file generated.
+- ArUco marker pose estimation implemented and tested.
+- Marker pose data streamed to Unity via UDP.
+- Unity receiver updated to visualize marker pose and sensor data in real time.
+- libcamera folder removed from git tracking (not used).
+
+### Next Steps
+- Commit and push latest changes.
+- Continue testing marker pose visualization in Unity.
+- Finalize integration and document workflow.
+
 

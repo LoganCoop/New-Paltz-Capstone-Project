@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -36,9 +37,22 @@ public class LidarUdpReceiver : MonoBehaviour
     public int port = 5005;
     public Transform pointPrefab;
     public float scaleMeters = 0.01f;
+    public float pointScale = 0.02f;
     public int maxPoints = 5000;
     public bool debugOverlay = true;
     public bool ignoreOrientation = false;
+    public bool flipX = true;
+    public bool flipY = true;
+    public Gradient distanceGradient;
+    public float minDistanceMeters = 0.1f;
+    public float maxDistanceMeters = 5.0f;
+    public float minIntensity = 0.2f;
+    public float maxIntensity = 1.5f;
+    public int minStrength = 100;
+    public int distanceMedianWindow = 5;
+    [Range(0.0f, 1.0f)] public float orientationSmoothing = 0.5f;
+    public float maxTimestampDeltaSeconds = 0.05f;
+    public float maxDistanceJumpMeters = 0.15f;
 
     private UdpClient _client;
     private Thread _thread;
@@ -51,6 +65,12 @@ public class LidarUdpReceiver : MonoBehaviour
 
     private Quaternion _calibration = Quaternion.identity;
     private bool _hasCalibration;
+    private MaterialPropertyBlock _mpb;
+    private static readonly int ColorId = Shader.PropertyToID("_Color");
+    private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+    private readonly List<float> _distanceSamples = new List<float>();
+    private Quaternion _smoothedOrientation = Quaternion.identity;
+    private bool _hasSmoothedOrientation;
 
     void Start()
     {
@@ -59,6 +79,7 @@ public class LidarUdpReceiver : MonoBehaviour
         _running = true;
         _thread = new Thread(ReceiveLoop) { IsBackground = true };
         _thread.Start();
+        _mpb = new MaterialPropertyBlock();
     }
 
     void ReceiveLoop()
@@ -125,22 +146,89 @@ public class LidarUdpReceiver : MonoBehaviour
 
         if (current.tfluna == null || current.bno055 == null) return;
 
+        if (!IsTimestampAligned(current.tfluna.timestamp, current.bno055.timestamp)) return;
+
         var q = new Quaternion(current.bno055.qx, current.bno055.qy, current.bno055.qz, current.bno055.qw);
         if (_hasCalibration)
         {
             q = _calibration * q;
         }
 
+        if (_hasSmoothedOrientation)
+        {
+            q = Quaternion.Slerp(_smoothedOrientation, q, orientationSmoothing);
+        }
+        _smoothedOrientation = q;
+        _hasSmoothedOrientation = true;
+
+        if (current.tfluna.strength < minStrength) return;
+
         var dir = ignoreOrientation ? Vector3.forward : (q * Vector3.forward);
-        var pos = dir * (current.tfluna.distance_cm * scaleMeters);
+        float rawDistanceMeters = current.tfluna.distance_cm * scaleMeters;
+        float filteredDistanceMeters = FilterDistance(rawDistanceMeters);
+        if (Mathf.Abs(rawDistanceMeters - filteredDistanceMeters) > maxDistanceJumpMeters) return;
+
+        float distanceMeters = filteredDistanceMeters;
+        var pos = dir * distanceMeters;
+        if (flipX) pos.x = -pos.x;
+        if (flipY) pos.y = -pos.y;
 
         var point = Instantiate(pointPrefab, pos, Quaternion.identity);
         point.SetParent(transform, false);
+        point.localScale = Vector3.one * pointScale;
+
+        ApplyDistanceColor(point, distanceMeters);
 
         if (transform.childCount > maxPoints)
         {
             Destroy(transform.GetChild(0).gameObject);
         }
+    }
+
+    void ApplyDistanceColor(Transform point, float distanceMeters)
+    {
+        var renderer = point.GetComponent<Renderer>();
+        if (renderer == null || distanceGradient == null) return;
+
+        float t = Mathf.InverseLerp(minDistanceMeters, maxDistanceMeters, distanceMeters);
+        Color color = distanceGradient.Evaluate(t);
+        float intensity = Mathf.Lerp(minIntensity, maxIntensity, t);
+        color *= intensity;
+        color.a = 1f;
+
+        renderer.GetPropertyBlock(_mpb);
+        _mpb.SetColor(ColorId, color);
+        _mpb.SetColor(BaseColorId, color);
+        renderer.SetPropertyBlock(_mpb);
+    }
+
+    float FilterDistance(float distanceMeters)
+    {
+        int window = Mathf.Max(1, distanceMedianWindow);
+        _distanceSamples.Add(distanceMeters);
+        if (_distanceSamples.Count > window)
+        {
+            _distanceSamples.RemoveAt(0);
+        }
+
+        if (_distanceSamples.Count == 1) return _distanceSamples[0];
+
+        var temp = _distanceSamples.ToArray();
+        System.Array.Sort(temp);
+        int mid = temp.Length / 2;
+        if (temp.Length % 2 == 1)
+        {
+            return temp[mid];
+        }
+
+        return 0.5f * (temp[mid - 1] + temp[mid]);
+    }
+
+    bool IsTimestampAligned(double tflunaTimestamp, double bnoTimestamp)
+    {
+        if (tflunaTimestamp <= 0 || bnoTimestamp <= 0) return true;
+        double delta = Math.Abs(tflunaTimestamp - bnoTimestamp);
+        return delta <= maxTimestampDeltaSeconds;
     }
 
     void OnGUI()

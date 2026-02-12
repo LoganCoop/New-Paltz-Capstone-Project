@@ -13,10 +13,23 @@ public class LidarUdpReceiver : MonoBehaviour
     [Serializable]
     public class Packet
     {
-        public double t;
-        public float dist_cm;
+        public Tfluna tfluna;
+        public Bno055 bno055;
+    }
+
+    [Serializable]
+    public class Tfluna
+    {
+        public double timestamp;
+        public float distance_cm;
         public int strength;
-        public float temp_c;
+        public float temperature_c;
+    }
+
+    [Serializable]
+    public class Bno055
+    {
+        public double timestamp;
         public float qw, qx, qy, qz;
     }
 
@@ -110,14 +123,16 @@ public class LidarUdpReceiver : MonoBehaviour
 
         if (current == null) return;
 
-        var q = new Quaternion(current.qx, current.qy, current.qz, current.qw);
+        if (current.tfluna == null || current.bno055 == null) return;
+
+        var q = new Quaternion(current.bno055.qx, current.bno055.qy, current.bno055.qz, current.bno055.qw);
         if (_hasCalibration)
         {
             q = _calibration * q;
         }
 
         var dir = ignoreOrientation ? Vector3.forward : (q * Vector3.forward);
-        var pos = dir * (current.dist_cm * scaleMeters);
+        var pos = dir * (current.tfluna.distance_cm * scaleMeters);
 
         var point = Instantiate(pointPrefab, pos, Quaternion.identity);
         point.SetParent(transform, false);

@@ -17,7 +17,7 @@ BNO055_ADDRESS = 0x29  # Default I2C address
 BNO055_RATE_HZ = 10.0
 
 # UDP config
-UDP_IP = "127.0.0.1"  # Change to your Unity machine's IP
+UDP_IP = "192.168.0.198"  # Change to your Unity machine's IP
 UDP_PORT = 5005
 
 

@@ -105,9 +105,9 @@ public class LidarUdpReceiver : MonoBehaviour
                 snapshot = _latest;
             }
 
-            if (snapshot != null)
+            if (snapshot != null && snapshot.bno055 != null)
             {
-                var raw = new Quaternion(snapshot.qx, snapshot.qy, snapshot.qz, snapshot.qw);
+                var raw = new Quaternion(snapshot.bno055.qx, snapshot.bno055.qy, snapshot.bno055.qz, snapshot.bno055.qw);
                 _calibration = Quaternion.Inverse(raw);
                 _hasCalibration = true;
             }

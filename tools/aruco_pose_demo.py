@@ -15,6 +15,18 @@ def load_calibration(path):
 
 
 def main():
+        import socket
+        import json
+        UDP_IP = "192.168.0.198"
+        UDP_PORT = 5005
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    import socket
+    import json
+
+    # UDP config for Unity
+    UDP_IP = "192.168.0.198"
+    UDP_PORT = 5005
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     parser = argparse.ArgumentParser(description="Detect ArUco markers with Pi Camera 3.")
     parser.add_argument("--marker-length", type=float, default=0.05, help="Marker side length (meters)")
     parser.add_argument("--calib", default=None, help="Path to .npz with camera_matrix and dist_coeffs")
@@ -57,9 +69,19 @@ def main():
     try:
         while True:
             frame = camera.capture_array()
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if frame is None or frame.size == 0:
+                print("Warning: Empty frame captured from camera.", file=sys.stderr)
+                time.sleep(interval)
+                continue
+            # Convert 4-channel (BGRA/RGBA) to 3-channel BGR if needed
+            if len(frame.shape) == 3 and frame.shape[2] == 4:
+                frame_bgr = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+            else:
+                frame_bgr = frame
+            gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
             corners, ids, _ = detector.detectMarkers(gray)
 
+            marker_data = []
             if ids is not None and len(ids) > 0:
                 ids_list = [int(x) for x in ids.flatten()]
                 print(f"markers={ids_list}")
@@ -73,10 +95,29 @@ def main():
                         print(
                             f"id={marker_id} tvec_m=({tvec[0]:.3f}, {tvec[1]:.3f}, {tvec[2]:.3f})"
                         )
+                        marker_data.append({
+                            "id": marker_id,
+                            "tvec": [float(tvec[0]), float(tvec[1]), float(tvec[2])]
+                        })
 
-            if args.display:
-                cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-                cv2.imshow("Aruco", frame)
+            # Send marker data over UDP if any markers detected
+            if marker_data:
+                packet = {"timestamp": time.time(), "markers": marker_data}
+                try:
+                    msg = json.dumps(packet).encode('utf-8')
+                    sock.sendto(msg, (UDP_IP, UDP_PORT))
+                    print(f"Sent UDP packet to {UDP_IP}:{UDP_PORT}")
+                except Exception as e:
+                    print(f"Warning: Failed to send UDP packet: {e}", file=sys.stderr)
+
+            if args.display and frame is not None and frame.size != 0:
+                # Use frame_bgr for display (guaranteed 3-channel BGR)
+                frame_disp = frame_bgr
+                try:
+                    cv2.aruco.drawDetectedMarkers(frame_disp, corners, ids)
+                except Exception as e:
+                    print(f"Warning: drawDetectedMarkers failed: {e}", file=sys.stderr)
+                cv2.imshow("Aruco", frame_disp)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
 

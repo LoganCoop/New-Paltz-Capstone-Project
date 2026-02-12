@@ -10,6 +10,22 @@ using UnityEngine.InputSystem;
 #endif
 
 public class LidarUdpReceiver : MonoBehaviour
+    [Serializable]
+    public class MarkerPacket
+    {
+        public double timestamp;
+        public List<Marker> markers;
+    }
+
+    [Serializable]
+    public class Marker
+    {
+        public int id;
+        public List<float> tvec;
+    }
+
+    private MarkerPacket _latestMarkerPacket;
+    private Dictionary<int, Transform> _markerObjects = new Dictionary<int, Transform>();
 {
     [Serializable]
     public class Packet
@@ -92,14 +108,26 @@ public class LidarUdpReceiver : MonoBehaviour
                 var data = _client.Receive(ref endPoint);
                 var json = Encoding.UTF8.GetString(data);
                 var packet = JsonUtility.FromJson<Packet>(json);
-                if (packet == null) continue;
-
-                lock (_lock)
+                if (packet != null)
                 {
-                    _latest = packet;
-                    _packetCount++;
-                    _lastPacketTicks = DateTime.UtcNow.Ticks;
-                    _lastSender = endPoint.ToString();
+                    lock (_lock)
+                    {
+                        _latest = packet;
+                        _packetCount++;
+                        _lastPacketTicks = DateTime.UtcNow.Ticks;
+                        _lastSender = endPoint.ToString();
+                    }
+                }
+                else
+                {
+                    var markerPacket = JsonUtility.FromJson<MarkerPacket>(json);
+                    if (markerPacket != null && markerPacket.markers != null && markerPacket.markers.Count > 0)
+                    {
+                        lock (_lock)
+                        {
+                            _latestMarkerPacket = markerPacket;
+                        }
+                    }
                 }
             }
             catch (SocketException)
@@ -117,6 +145,31 @@ public class LidarUdpReceiver : MonoBehaviour
     }
 
     void Update()
+            // Visualize marker poses
+            MarkerPacket markerPacket;
+            lock (_lock)
+            {
+                markerPacket = _latestMarkerPacket;
+            }
+            if (markerPacket != null && markerPacket.markers != null)
+            {
+                foreach (var marker in markerPacket.markers)
+                {
+                    Vector3 pos = new Vector3(marker.tvec[0], marker.tvec[1], marker.tvec[2]);
+                    Transform markerObj;
+                    if (!_markerObjects.TryGetValue(marker.id, out markerObj) || markerObj == null)
+                    {
+                        markerObj = Instantiate(pointPrefab, pos, Quaternion.identity);
+                        markerObj.SetParent(transform, false);
+                        markerObj.localScale = Vector3.one * pointScale;
+                        _markerObjects[marker.id] = markerObj;
+                    }
+                    else
+                    {
+                        markerObj.position = pos;
+                    }
+                }
+            }
     {
         if (IsCalibrationPressed())
         {

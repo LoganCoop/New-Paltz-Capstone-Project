@@ -56,7 +56,7 @@ public class LidarUdpReceiver : MonoBehaviour
     public Transform pointPrefab;
     public float scaleMeters = 0.01f;
     public float pointScale = 0.02f;
-    public int maxPoints = 5000;
+    public int maxPoints = 50000; // Increased for mesh-based system
     [Header("Position Source")]
     public bool usePosField = true; // when true, use `pos_m` from UDP if present
     public bool debugOverlay = true;
@@ -73,6 +73,12 @@ public class LidarUdpReceiver : MonoBehaviour
     [Range(0.0f, 1.0f)] public float orientationSmoothing = 0.5f;
     public float maxTimestampDeltaSeconds = 0.05f;
     public float maxDistanceJumpMeters = 0.15f;
+    [Header("Spatial Deduplication")]
+    public bool useSpatialDeduplication = true;
+    public float voxelSize = 0.03f; // 3cm grid for deduplication
+    [Header("Mesh-Based Rendering")]
+    public bool useMeshRenderer = true;
+    public Material pointCloudMaterial;
 
     private UdpClient _client;
     private Thread _thread;
@@ -92,6 +98,19 @@ public class LidarUdpReceiver : MonoBehaviour
     private Quaternion _smoothedOrientation = Quaternion.identity;
     private bool _hasSmoothedOrientation;
 
+    // Mesh-based point cloud system
+    private Mesh _pointCloudMesh;
+    private MeshFilter _meshFilter;
+    private MeshRenderer _meshRenderer;
+    private List<Vector3> _vertices = new List<Vector3>();
+    private List<Color> _colors = new List<Color>();
+    private List<int> _indices = new List<int>();
+    private bool _meshNeedsUpdate = false;
+    
+    // Spatial deduplication
+    private HashSet<Vector3Int> _occupiedVoxels = new HashSet<Vector3Int>();
+    private Dictionary<Vector3Int, int> _voxelToVertexIndex = new Dictionary<Vector3Int, int>();
+
     void Start()
     {
         _client = new UdpClient(port);
@@ -100,6 +119,43 @@ public class LidarUdpReceiver : MonoBehaviour
         _thread = new Thread(ReceiveLoop) { IsBackground = true };
         _thread.Start();
         _mpb = new MaterialPropertyBlock();
+        
+        // Initialize mesh-based point cloud system
+        if (useMeshRenderer)
+        {
+            InitializeMeshRenderer();
+        }
+    }
+    
+    void InitializeMeshRenderer()
+    {
+        _pointCloudMesh = new Mesh();
+        _pointCloudMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32; // Support more than 65k vertices
+        
+        // Create or get MeshFilter and MeshRenderer
+        _meshFilter = gameObject.GetComponent<MeshFilter>();
+        if (_meshFilter == null)
+        {
+            _meshFilter = gameObject.AddComponent<MeshFilter>();
+        }
+        _meshFilter.mesh = _pointCloudMesh;
+        
+        _meshRenderer = gameObject.GetComponent<MeshRenderer>();
+        if (_meshRenderer == null)
+        {
+            _meshRenderer = gameObject.AddComponent<MeshRenderer>();
+        }
+        
+        if (pointCloudMaterial != null)
+        {
+            _meshRenderer.material = pointCloudMaterial;
+        }
+        else
+        {
+            // Create a simple unlit material if none provided
+            _meshRenderer.material = new Material(Shader.Find("Unlit/Color"));
+            _meshRenderer.material.SetColor("_Color", Color.white);
+        }
     }
 
     void ReceiveLoop()
@@ -243,28 +299,137 @@ public class LidarUdpReceiver : MonoBehaviour
             if (flipY) pos.y = -pos.y;
         }
 
-        var point = Instantiate(pointPrefab, pos, Quaternion.identity);
-        point.SetParent(transform, false);
-        point.localScale = Vector3.one * pointScale;
-
-        ApplyDistanceColor(point, distanceMeters);
-
-        if (transform.childCount > maxPoints)
+        // Add point using mesh-based or GameObject-based system
+        if (useMeshRenderer)
         {
-            Destroy(transform.GetChild(0).gameObject);
+            AddPointToMesh(pos, distanceMeters);
+        }
+        else
+        {
+            // Fallback to old GameObject system
+            if (pointPrefab != null)
+            {
+                var point = Instantiate(pointPrefab, pos, Quaternion.identity);
+                point.SetParent(transform, false);
+                point.localScale = Vector3.one * pointScale;
+                ApplyDistanceColor(point, distanceMeters);
+
+                if (transform.childCount > maxPoints)
+                {
+                    Destroy(transform.GetChild(0).gameObject);
+                }
+            }
         }
     }
 
-    void ApplyDistanceColor(Transform point, float distanceMeters)
+    void AddPointToMesh(Vector3 pos, float distanceMeters)
     {
-        var renderer = point.GetComponent<Renderer>();
-        if (renderer == null || distanceGradient == null) return;
-
+        // Spatial deduplication check
+        if (useSpatialDeduplication)
+        {
+            Vector3Int voxel = GetVoxelCoord(pos);
+            if (_occupiedVoxels.Contains(voxel))
+            {
+                return; // Skip duplicate point in same voxel
+            }
+            _occupiedVoxels.Add(voxel);
+            _voxelToVertexIndex[voxel] = _vertices.Count;
+        }
+        
+        // Add vertex
+        _vertices.Add(pos);
+        
+        // Calculate color based on distance
+        Color color = CalculateDistanceColor(distanceMeters);
+        _colors.Add(color);
+        
+        // Add index for point topology
+        _indices.Add(_vertices.Count - 1);
+        
+        // Mark mesh for update
+        _meshNeedsUpdate = true;
+        
+        // Remove oldest points if exceeding max
+        if (_vertices.Count > maxPoints)
+        {
+            RemoveOldestPoint();
+        }
+    }
+    
+    Vector3Int GetVoxelCoord(Vector3 pos)
+    {
+        return new Vector3Int(
+            Mathf.RoundToInt(pos.x / voxelSize),
+            Mathf.RoundToInt(pos.y / voxelSize),
+            Mathf.RoundToInt(pos.z / voxelSize)
+        );
+    }
+    
+    void RemoveOldestPoint()
+    {
+        if (_vertices.Count == 0) return;
+        
+        // Remove from voxel tracking
+        if (useSpatialDeduplication && _vertices.Count > 0)
+        {
+            Vector3 oldestPos = _vertices[0];
+            Vector3Int voxel = GetVoxelCoord(oldestPos);
+            _occupiedVoxels.Remove(voxel);
+            _voxelToVertexIndex.Remove(voxel);
+        }
+        
+        // Remove oldest vertex, color, and index
+        _vertices.RemoveAt(0);
+        _colors.RemoveAt(0);
+        _indices.RemoveAt(0);
+        
+        // Update all indices (shift down by 1)
+        for (int i = 0; i < _indices.Count; i++)
+        {
+            _indices[i]--;
+        }
+        
+        _meshNeedsUpdate = true;
+    }
+    
+    void LateUpdate()
+    {
+        // Update mesh if points were added this frame
+        if (useMeshRenderer && _meshNeedsUpdate && _pointCloudMesh != null)
+        {
+            UpdateMesh();
+            _meshNeedsUpdate = false;
+        }
+    }
+    
+    void UpdateMesh()
+    {
+        _pointCloudMesh.Clear();
+        _pointCloudMesh.SetVertices(_vertices);
+        _pointCloudMesh.SetColors(_colors);
+        _pointCloudMesh.SetIndices(_indices, MeshTopology.Points, 0);
+        _pointCloudMesh.RecalculateBounds();
+    }
+    
+    Color CalculateDistanceColor(float distanceMeters)
+    {
+        if (distanceGradient == null) return Color.white;
+        
         float t = Mathf.InverseLerp(minDistanceMeters, maxDistanceMeters, distanceMeters);
         Color color = distanceGradient.Evaluate(t);
         float intensity = Mathf.Lerp(minIntensity, maxIntensity, t);
         color *= intensity;
         color.a = 1f;
+        
+        return color;
+    }
+    
+    void ApplyDistanceColor(Transform point, float distanceMeters)
+    {
+        var renderer = point.GetComponent<Renderer>();
+        if (renderer == null || distanceGradient == null) return;
+
+        Color color = CalculateDistanceColor(distanceMeters);
 
         renderer.GetPropertyBlock(_mpb);
         _mpb.SetColor(ColorId, color);
@@ -322,6 +487,18 @@ public class LidarUdpReceiver : MonoBehaviour
         GUI.Label(new Rect(10, 10, 600, 20), "UDP packets: " + count);
         GUI.Label(new Rect(10, 30, 600, 20), "Last packet: " + lastSeen + " ago");
         GUI.Label(new Rect(10, 50, 600, 20), "Last sender: " + (sender ?? "n/a"));
+        
+        if (useMeshRenderer)
+        {
+            GUI.Label(new Rect(10, 70, 600, 20), "Point count: " + _vertices.Count + " / " + maxPoints);
+            GUI.Label(new Rect(10, 90, 600, 20), "Unique voxels: " + _occupiedVoxels.Count);
+            GUI.Label(new Rect(10, 110, 600, 20), "Mode: Mesh-based (optimized)");
+        }
+        else
+        {
+            GUI.Label(new Rect(10, 70, 600, 20), "Point count: " + transform.childCount);
+            GUI.Label(new Rect(10, 90, 600, 20), "Mode: GameObject-based (legacy)");
+        }
     }
 
     bool IsCalibrationPressed()

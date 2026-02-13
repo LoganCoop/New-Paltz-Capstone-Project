@@ -10,6 +10,7 @@ using UnityEngine.InputSystem;
 #endif
 
 public class LidarUdpReceiver : MonoBehaviour
+{
     [Serializable]
     public class MarkerPacket
     {
@@ -26,7 +27,7 @@ public class LidarUdpReceiver : MonoBehaviour
 
     private MarkerPacket _latestMarkerPacket;
     private Dictionary<int, Transform> _markerObjects = new Dictionary<int, Transform>();
-{
+
     [Serializable]
     public class Packet
     {
@@ -148,32 +149,33 @@ public class LidarUdpReceiver : MonoBehaviour
     }
 
     void Update()
-            // Visualize marker poses
-            MarkerPacket markerPacket;
-            lock (_lock)
+    {
+        // Visualize marker poses
+        MarkerPacket markerPacket;
+        lock (_lock)
+        {
+            markerPacket = _latestMarkerPacket;
+        }
+        if (markerPacket != null && markerPacket.markers != null)
+        {
+            foreach (var marker in markerPacket.markers)
             {
-                markerPacket = _latestMarkerPacket;
-            }
-            if (markerPacket != null && markerPacket.markers != null)
-            {
-                foreach (var marker in markerPacket.markers)
+                Vector3 pos = new Vector3(marker.tvec[0], marker.tvec[1], marker.tvec[2]);
+                Transform markerObj;
+                if (!_markerObjects.TryGetValue(marker.id, out markerObj) || markerObj == null)
                 {
-                    Vector3 pos = new Vector3(marker.tvec[0], marker.tvec[1], marker.tvec[2]);
-                    Transform markerObj;
-                    if (!_markerObjects.TryGetValue(marker.id, out markerObj) || markerObj == null)
-                    {
-                        markerObj = Instantiate(pointPrefab, pos, Quaternion.identity);
-                        markerObj.SetParent(transform, false);
-                        markerObj.localScale = Vector3.one * pointScale;
-                        _markerObjects[marker.id] = markerObj;
-                    }
-                    else
-                    {
-                        markerObj.position = pos;
-                    }
+                    markerObj = Instantiate(pointPrefab, pos, Quaternion.identity);
+                    markerObj.SetParent(transform, false);
+                    markerObj.localScale = Vector3.one * pointScale;
+                    _markerObjects[marker.id] = markerObj;
+                }
+                else
+                {
+                    markerObj.position = pos;
                 }
             }
-    {
+        }
+
         if (IsCalibrationPressed())
         {
             Packet snapshot;

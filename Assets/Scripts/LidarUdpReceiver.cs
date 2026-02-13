@@ -160,18 +160,18 @@ public class LidarUdpReceiver : MonoBehaviour
         {
             foreach (var marker in markerPacket.markers)
             {
-                Vector3 pos = new Vector3(marker.tvec[0], marker.tvec[1], marker.tvec[2]);
+                Vector3 markerPos = new Vector3(marker.tvec[0], marker.tvec[1], marker.tvec[2]);
                 Transform markerObj;
                 if (!_markerObjects.TryGetValue(marker.id, out markerObj) || markerObj == null)
                 {
-                    markerObj = Instantiate(pointPrefab, pos, Quaternion.identity);
+                    markerObj = Instantiate(pointPrefab, markerPos, Quaternion.identity);
                     markerObj.SetParent(transform, false);
                     markerObj.localScale = Vector3.one * pointScale;
                     _markerObjects[marker.id] = markerObj;
                 }
                 else
                 {
-                    markerObj.position = pos;
+                    markerObj.position = markerPos;
                 }
             }
         }
@@ -222,11 +222,13 @@ public class LidarUdpReceiver : MonoBehaviour
         if (current.tfluna.strength < minStrength) return;
 
         Vector3 pos;
+        float distanceMeters;
         if (current.pos_m != null && current.pos_m.Length >= 3)
         {
             pos = new Vector3(current.pos_m[0], current.pos_m[1], current.pos_m[2]);
             if (flipX) pos.x = -pos.x;
             if (flipY) pos.y = -pos.y;
+            distanceMeters = pos.magnitude;
         }
         else
         {
@@ -235,7 +237,7 @@ public class LidarUdpReceiver : MonoBehaviour
             float filteredDistanceMeters = FilterDistance(rawDistanceMeters);
             if (Mathf.Abs(rawDistanceMeters - filteredDistanceMeters) > maxDistanceJumpMeters) return;
 
-            float distanceMeters = filteredDistanceMeters;
+            distanceMeters = filteredDistanceMeters;
             pos = dir * distanceMeters;
             if (flipX) pos.x = -pos.x;
             if (flipY) pos.y = -pos.y;

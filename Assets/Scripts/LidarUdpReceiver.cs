@@ -32,6 +32,7 @@ public class LidarUdpReceiver : MonoBehaviour
     {
         public Tfluna tfluna;
         public Bno055 bno055;
+        public float[] pos_m;
     }
 
     [Serializable]
@@ -55,6 +56,8 @@ public class LidarUdpReceiver : MonoBehaviour
     public float scaleMeters = 0.01f;
     public float pointScale = 0.02f;
     public int maxPoints = 5000;
+    [Header("Position Source")]
+    public bool usePosField = true; // when true, use `pos_m` from UDP if present
     public bool debugOverlay = true;
     public bool ignoreOrientation = false;
     public bool flipX = true;
@@ -216,15 +219,25 @@ public class LidarUdpReceiver : MonoBehaviour
 
         if (current.tfluna.strength < minStrength) return;
 
-        var dir = ignoreOrientation ? Vector3.forward : (q * Vector3.forward);
-        float rawDistanceMeters = current.tfluna.distance_cm * scaleMeters;
-        float filteredDistanceMeters = FilterDistance(rawDistanceMeters);
-        if (Mathf.Abs(rawDistanceMeters - filteredDistanceMeters) > maxDistanceJumpMeters) return;
+        Vector3 pos;
+        if (current.pos_m != null && current.pos_m.Length >= 3)
+        {
+            pos = new Vector3(current.pos_m[0], current.pos_m[1], current.pos_m[2]);
+            if (flipX) pos.x = -pos.x;
+            if (flipY) pos.y = -pos.y;
+        }
+        else
+        {
+            var dir = ignoreOrientation ? Vector3.forward : (q * Vector3.forward);
+            float rawDistanceMeters = current.tfluna.distance_cm * scaleMeters;
+            float filteredDistanceMeters = FilterDistance(rawDistanceMeters);
+            if (Mathf.Abs(rawDistanceMeters - filteredDistanceMeters) > maxDistanceJumpMeters) return;
 
-        float distanceMeters = filteredDistanceMeters;
-        var pos = dir * distanceMeters;
-        if (flipX) pos.x = -pos.x;
-        if (flipY) pos.y = -pos.y;
+            float distanceMeters = filteredDistanceMeters;
+            pos = dir * distanceMeters;
+            if (flipX) pos.x = -pos.x;
+            if (flipY) pos.y = -pos.y;
+        }
 
         var point = Instantiate(pointPrefab, pos, Quaternion.identity);
         point.SetParent(transform, false);

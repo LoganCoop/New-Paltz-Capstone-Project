@@ -2,6 +2,7 @@ import socket
 import threading
 import time
 import json
+import math
 import serial
 import board
 import busio
@@ -19,6 +20,30 @@ BNO055_RATE_HZ = 10.0
 # UDP config
 UDP_IP = "192.168.0.198"  # Change to your Unity machine's IP
 UDP_PORT = 5005
+# TF-Luna position offset (meters) relative to IMU origin (x,y,z)
+TF_LUNA_OFFSET = (0.0, 0.0, 0.0)
+
+
+def quat_conjugate(q):
+    w, x, y, z = q
+    return (w, -x, -y, -z)
+
+
+def quat_mul(a, b):
+    aw, ax, ay, az = a
+    bw, bx, by, bz = b
+    return (
+        aw * bw - ax * bx - ay * by - az * bz,
+        aw * bx + ax * bw + ay * bz - az * by,
+        aw * by - ax * bz + ay * bw + az * bx,
+        aw * bz + ax * by - ay * bx + az * bw,
+    )
+
+
+def rotate_vector_by_quat(q, v):
+    qv = (0.0, v[0], v[1], v[2])
+    qc = quat_conjugate(q)
+    return quat_mul(quat_mul(q, qv), qc)[1:]
 
 
 def read_tfluna(port_path, baud, timeout, result_dict):
@@ -81,9 +106,33 @@ def main():
     print(f"Sending UDP packets to {UDP_IP}:{UDP_PORT}")
     while True:
         if 'tfluna' in data and 'bno055' in data:
+            # compute world-space point from TF-Luna distance and BNO055 quaternion
+            try:
+                distance_cm = data['tfluna'].get('distance_cm')
+                dist_m = float(distance_cm) / 100.0
+                qw = data['bno055'].get('qw')
+                qx = data['bno055'].get('qx')
+                qy = data['bno055'].get('qy')
+                qz = data['bno055'].get('qz')
+                norm = math.sqrt(qw * qw + qx * qx + qy * qy + qz * qz)
+                if norm == 0:
+                    q = (1.0, 0.0, 0.0, 0.0)
+                else:
+                    q = (qw / norm, qx / norm, qy / norm, qz / norm)
+
+                local_v = (0.0, 0.0, dist_m)
+                world_v = rotate_vector_by_quat(q, local_v)
+                ox, oy, oz = TF_LUNA_OFFSET
+                pos_m = [world_v[0] + ox, world_v[1] + oy, world_v[2] + oz]
+            except Exception:
+                pos_m = None
+                dist_m = None
+
             packet = {
                 'tfluna': data['tfluna'],
-                'bno055': data['bno055']
+                'bno055': data['bno055'],
+                'dist_m': dist_m,
+                'pos_m': pos_m,
             }
             msg = json.dumps(packet).encode('utf-8')
             sock.sendto(msg, (UDP_IP, UDP_PORT))

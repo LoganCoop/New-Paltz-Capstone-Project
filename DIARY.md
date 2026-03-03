@@ -48,3 +48,15 @@
 - Commit and push latest changes.
 - Continue testing marker pose visualization in Unity.
 - Finalize integration and document workflow.
+
+## (3/3/26)
+### What I accomplished
+- 
+- 
+- 
+- 
+
+### Next Steps
+- 
+- 
+- 

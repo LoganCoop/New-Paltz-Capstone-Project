@@ -1,0 +1,12 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://cqk7h8vxj3hn2"]
+
+[ext_resource type="Shader" path="res://shaders/point_cloud.gdshader" id="1"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1")
+shader_parameter/point_size = 8.0
+shader_parameter/brightness = 1.2
+shader_parameter/use_distance_fade = true
+shader_parameter/fade_distance = 10.0
+shader_parameter/near_fade_distance = 0.5

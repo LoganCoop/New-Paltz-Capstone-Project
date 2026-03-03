@@ -95,10 +95,12 @@
 
 ### Controller Test
 1. [ ] **Left thumbstick**: Move forward/back/strafe
-2. [ ] **Right thumbstick left/right**: Rotate view
-3. [ ] **Right A button**: Toggle spatial deduplication
-4. [ ] **Right B button**: Clear point cloud
-5. [ ] **Right grip + trigger**: Scale point cloud
+2. [ ] **Left grip + thumbstick X**: Rotate view
+3. [ ] **Left grip + trigger**: Scale point cloud up
+4. [ ] **Left trigger click**: Recenter player
+5. [ ] **Left X/A button**: Toggle spatial deduplication
+6. [ ] **Left Y/B button**: Clear point cloud
+7. [ ] **Left Menu button**: Toggle HUD visibility
 
 ---
 
@@ -150,7 +152,6 @@ Once basic functionality works:
 3. [ ] Experiment with voxel size for quality vs performance
 4. [ ] Add multiple TFLuna sensors for faster scanning
 5. [ ] Implement point cloud export to PLY/OBJ format
-6. [ ] Try Quest 3 passthrough mode for mixed reality
 
 ---
 

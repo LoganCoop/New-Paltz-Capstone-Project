@@ -7,7 +7,7 @@ signal marker_packet_received(marker_data: Dictionary)
 
 @export var port: int = 5005
 @export var debug_overlay: bool = true
-@export var max_timestamp_delta: float = 0.05
+@export var max_timestamp_delta: float = 0.5  # Increased tolerance for packet processing delay
 
 var udp_socket: PacketPeerUDP
 var is_listening: bool = false
@@ -27,7 +27,8 @@ func _ready() -> void:
 
 func start_listening() -> void:
 	udp_socket = PacketPeerUDP.new()
-	var result = udp_socket.bind(port)
+	# Bind to IPv4 explicitly to accept packets from Python sender
+	var result = udp_socket.bind(port, "0.0.0.0")
 	
 	if result == OK:
 		is_listening = true
@@ -50,10 +51,16 @@ func _process(_delta: float) -> void:
 		return
 	
 	# Process all available packets
+	var packet_count_available = udp_socket.get_available_packet_count()
+	if packet_count_available > 0:
+		print("DEBUG: %d UDP packets available" % packet_count_available)
+	
 	while udp_socket.get_available_packet_count() > 0:
 		var packet = udp_socket.get_packet()
 		var sender_ip = udp_socket.get_packet_ip()
 		var sender_port = udp_socket.get_packet_port()
+		
+		print("DEBUG: Received packet from %s:%d, size: %d bytes" % [sender_ip, sender_port, packet.size()])
 		
 		if packet.size() > 0:
 			process_packet(packet, sender_ip, sender_port)
@@ -89,13 +96,85 @@ func process_packet(packet: PackedByteArray, sender_ip: String, sender_port: int
 	if data.has("markers"):
 		emit_signal("marker_packet_received", data)
 	else:
-		# Validate sensor packet structure
-		if validate_packet(data):
-			emit_signal("packet_received", data)
+		# Normalize and validate sensor packet structure
+		var normalized_data = normalize_sensor_packet(data)
+		if validate_packet(normalized_data):
+			emit_signal("packet_received", normalized_data)
 		else:
 			packets_dropped += 1
 			if debug_overlay:
-				print("Invalid packet structure")
+				print("Invalid packet structure. Keys: ", data.keys())
+
+
+func normalize_sensor_packet(data: Dictionary) -> Dictionary:
+	var normalized: Dictionary = {}
+	var now_s: float = Time.get_ticks_msec() / 1000.0
+
+	# -----------------------------
+	# Normalize TFLuna payload
+	# -----------------------------
+	var tfluna_out: Dictionary = {}
+	if data.has("tfluna") and typeof(data["tfluna"]) == TYPE_DICTIONARY:
+		var tfluna_in: Dictionary = data["tfluna"]
+		var distance_cm = tfluna_in.get("distance_cm", tfluna_in.get("dist_cm", null))
+		var strength = tfluna_in.get("strength", null)
+		var tstamp = tfluna_in.get("timestamp", data.get("t", now_s))
+		if distance_cm != null and strength != null:
+			tfluna_out = {
+				"distance_cm": distance_cm,
+				"strength": strength,
+				"timestamp": tstamp
+			}
+	elif data.has("distance_cm") or data.has("dist_cm"):
+		var distance_cm_flat = data.get("distance_cm", data.get("dist_cm", null))
+		var strength_flat = data.get("strength", null)
+		var tstamp_flat = data.get("timestamp", data.get("t", now_s))
+		if distance_cm_flat != null and strength_flat != null:
+			tfluna_out = {
+				"distance_cm": distance_cm_flat,
+				"strength": strength_flat,
+				"timestamp": tstamp_flat
+			}
+
+	# -----------------------------
+	# Normalize BNO055 payload
+	# -----------------------------
+	var bno055_out: Dictionary = {}
+	if data.has("bno055") and typeof(data["bno055"]) == TYPE_DICTIONARY:
+		var bno_in: Dictionary = data["bno055"]
+		if bno_in.has("quat") and typeof(bno_in["quat"]) == TYPE_ARRAY and bno_in["quat"].size() >= 4:
+			var quat_arr: Array = bno_in["quat"]
+			bno055_out = {
+				"qw": quat_arr[0],
+				"qx": quat_arr[1],
+				"qy": quat_arr[2],
+				"qz": quat_arr[3],
+				"timestamp": bno_in.get("timestamp", data.get("t", now_s))
+			}
+		elif bno_in.has("qw") and bno_in.has("qx") and bno_in.has("qy") and bno_in.has("qz"):
+			bno055_out = {
+				"qw": bno_in["qw"],
+				"qx": bno_in["qx"],
+				"qy": bno_in["qy"],
+				"qz": bno_in["qz"],
+				"timestamp": bno_in.get("timestamp", data.get("t", now_s))
+			}
+	elif data.has("qw") and data.has("qx") and data.has("qy") and data.has("qz"):
+		bno055_out = {
+			"qw": data["qw"],
+			"qx": data["qx"],
+			"qy": data["qy"],
+			"qz": data["qz"],
+			"timestamp": data.get("timestamp", data.get("t", now_s))
+		}
+
+	if not tfluna_out.is_empty() and not bno055_out.is_empty():
+		normalized["tfluna"] = tfluna_out
+		normalized["bno055"] = bno055_out
+		if data.has("pos_m"):
+			normalized["pos_m"] = data["pos_m"]
+
+	return normalized
 
 
 func validate_packet(data: Dictionary) -> bool:

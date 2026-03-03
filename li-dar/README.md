@@ -126,7 +126,6 @@ Edit `scripts/point_cloud_visualizer.gd`:
 - [ ] Hand tracking instead of controllers
 - [ ] Spatial anchors for persistent clouds
 - [ ] WiFi direct instead of UDP broadcast
-- [ ] Quest 3 passthrough mode integration
 
 ---
 

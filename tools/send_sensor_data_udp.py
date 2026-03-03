@@ -3,25 +3,20 @@ import threading
 import time
 import json
 import math
+import argparse
 import serial
 import board
 import busio
 import adafruit_bno055
 
-# TF-Luna config
-TF_LUNA_PORT = "/dev/serial0"
-TF_LUNA_BAUD = 115200
-TF_LUNA_TIMEOUT = 1.0
-
-# BNO055 config
-BNO055_ADDRESS = 0x29  # Default I2C address
-BNO055_RATE_HZ = 10.0
-
-# UDP config
-UDP_IP = "192.168.0.198"  # Change to your Unity machine's IP
-UDP_PORT = 5005
-# TF-Luna position offset (meters) relative to IMU origin (x,y,z)
-TF_LUNA_OFFSET = (0.0, 0.0, 0.0)
+DEFAULT_TF_LUNA_PORT = "/dev/serial0"
+DEFAULT_TF_LUNA_BAUD = 115200
+DEFAULT_TF_LUNA_TIMEOUT = 1.0
+DEFAULT_BNO055_ADDRESS = "0x29"
+DEFAULT_BNO055_RATE_HZ = 10.0
+DEFAULT_UDP_PORT = 5005
+DEFAULT_SEND_RATE_HZ = 20.0
+DEFAULT_TF_LUNA_OFFSET = (0.0, 0.0, 0.0)
 
 
 def quat_conjugate(q):
@@ -95,15 +90,40 @@ def read_bno055(result_dict, address, rate_hz):
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Stream TF-Luna + BNO055 data to the VR APK over UDP."
+    )
+    parser.add_argument("--ip", required=True, help="Quest headset IP address")
+    parser.add_argument("--udp-port", type=int, default=DEFAULT_UDP_PORT, help="Destination UDP port")
+    parser.add_argument("--tfluna-port", default=DEFAULT_TF_LUNA_PORT, help="TF-Luna serial port")
+    parser.add_argument("--tfluna-baud", type=int, default=DEFAULT_TF_LUNA_BAUD, help="TF-Luna baud rate")
+    parser.add_argument("--tfluna-timeout", type=float, default=DEFAULT_TF_LUNA_TIMEOUT, help="TF-Luna serial timeout")
+    parser.add_argument("--bno-address", default=DEFAULT_BNO055_ADDRESS, help="BNO055 I2C address (hex), e.g. 0x28 or 0x29")
+    parser.add_argument("--bno-rate", type=float, default=DEFAULT_BNO055_RATE_HZ, help="BNO055 sample rate in Hz")
+    parser.add_argument("--send-rate", type=float, default=DEFAULT_SEND_RATE_HZ, help="UDP send rate in Hz")
+    parser.add_argument("--offset", nargs=3, type=float, default=list(DEFAULT_TF_LUNA_OFFSET), help="XYZ sensor offset in meters")
+    args = parser.parse_args()
+
+    bno_address = int(args.bno_address, 16)
+    send_interval = 1.0 / max(args.send_rate, 0.1)
+
     data = {}
     # Start sensor threads
-    t1 = threading.Thread(target=read_tfluna, args=(TF_LUNA_PORT, TF_LUNA_BAUD, TF_LUNA_TIMEOUT, data), daemon=True)
-    t2 = threading.Thread(target=read_bno055, args=(data, BNO055_ADDRESS, BNO055_RATE_HZ), daemon=True)
+    t1 = threading.Thread(
+        target=read_tfluna,
+        args=(args.tfluna_port, args.tfluna_baud, args.tfluna_timeout, data),
+        daemon=True,
+    )
+    t2 = threading.Thread(
+        target=read_bno055,
+        args=(data, bno_address, args.bno_rate),
+        daemon=True,
+    )
     t1.start()
     t2.start()
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    print(f"Sending UDP packets to {UDP_IP}:{UDP_PORT}")
+    print(f"Sending UDP packets to {args.ip}:{args.udp_port}")
     while True:
         if 'tfluna' in data and 'bno055' in data:
             # compute world-space point from TF-Luna distance and BNO055 quaternion
@@ -122,7 +142,7 @@ def main():
 
                 local_v = (0.0, 0.0, dist_m)
                 world_v = rotate_vector_by_quat(q, local_v)
-                ox, oy, oz = TF_LUNA_OFFSET
+                ox, oy, oz = args.offset
                 pos_m = [world_v[0] + ox, world_v[1] + oy, world_v[2] + oz]
             except Exception:
                 pos_m = None
@@ -135,8 +155,8 @@ def main():
                 'pos_m': pos_m,
             }
             msg = json.dumps(packet).encode('utf-8')
-            sock.sendto(msg, (UDP_IP, UDP_PORT))
-        time.sleep(0.05)  # 20 Hz
+            sock.sendto(msg, (args.ip, args.udp_port))
+        time.sleep(send_interval)
 
 
 if __name__ == "__main__":

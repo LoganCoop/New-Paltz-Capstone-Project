@@ -5,7 +5,7 @@
 [resource]
 render_priority = 0
 shader = ExtResource("1")
-shader_parameter/point_size = 8.0
+shader_parameter/point_size = 25.0
 shader_parameter/brightness = 1.2
 shader_parameter/use_distance_fade = true
 shader_parameter/fade_distance = 10.0

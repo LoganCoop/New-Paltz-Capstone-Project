@@ -1,7 +1,7 @@
 # Godot Quest 3 VR LiDAR Point Cloud Setup Guide
 
 ## Overview
-This Godot 4.x project provides a VR-based LiDAR point cloud visualization system for Meta Quest 3. It replaces the need for a PiCam 3 by using the Quest 3's passthrough cameras and positional tracking to create more accurate point cloud visualizations.
+This Godot 4.x project provides a VR-based LiDAR point cloud visualization system for Meta Quest 3. It uses Quest 3 positional tracking to create accurate point cloud visualizations in VR with a black background.
 
 ## What This Setup Does
 - Receives LiDAR data via UDP (TFLuna distance sensor + BNO055 orientation)
@@ -113,7 +113,7 @@ Enable these permissions:
 **XR Features Tab:**
 - **XR Mode**: OpenXR
 - **Hand Tracking**: V2.0 (Quest 3 feature)
-- **Passthrough**: Enabled (for mixed reality)
+- **Passthrough**: Disabled
 - **Foveation Level**: High (for performance)
 
 ### Step 3.3: Set Android Manifest
@@ -309,11 +309,6 @@ Edit `scripts/point_cloud_visualizer.gd`:
 @export var min_color: Color = Color(0.0, 1.0, 0.0)  # Green for close
 @export var max_color: Color = Color(1.0, 1.0, 0.0)  # Yellow for far
 ```
-
-### Add Passthrough (Mixed Reality)
-1. Open `scenes/main_vr.tscn`
-2. Add a **XRCompositionLayerPassthrough** node under **XROrigin3D**
-3. This will show Quest 3's camera view behind the point cloud
 
 ---
 

@@ -12,7 +12,7 @@ config_version=5
 
 config/name="LiDAR VR Point Cloud"
 run/main_scene="res://scenes/main_vr.tscn"
-config/features=PackedStringArray("4.6", "Forward Plus")
+config/features=PackedStringArray("4.6", "Mobile")
 config/icon="res://icon.svg"
 
 [display]
@@ -28,15 +28,14 @@ window/vsync/vsync_mode=0
 
 [rendering]
 
-renderer/rendering_method.mobile="forward_plus"
+renderer/rendering_method="mobile"
 textures/vram_compression/import_etc2_astc=true
 anti_aliasing/quality/msaa_3d=2
-vrs/mode=1
-vrs/texture="res://vrs_texture.png"
 
 [xr]
 
 openxr/enabled=true
+openxr/environment_blend_mode=0
 openxr/foveation_level=3
 openxr/foveation_dynamic=true
 shaders/enabled=true

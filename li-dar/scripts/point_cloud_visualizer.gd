@@ -3,7 +3,7 @@ extends Node3D
 ## Creates and updates a mesh-based point cloud from incoming UDP packets
 
 @export var max_points: int = 50000
-@export var point_scale: float = 0.02
+@export var point_scale: float = 0.5
 @export var scale_meters: float = 0.01
 @export var use_spatial_deduplication: bool = true
 @export var voxel_size: float = 0.03
@@ -67,11 +67,18 @@ func _ready() -> void:
 
 
 func setup_material() -> void:
-	var material = StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.vertex_color_use_as_albedo = true
-	material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# Load or create material for point rendering
+	var material = load("res://materials/point_cloud_material.tres")
+	
+	if material == null:
+		# Fallback: Create a basic material
+		material = StandardMaterial3D.new()
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.vertex_color_use_as_albedo = true
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		material.point_size = 20.0
+	
 	mesh_instance.material_override = material
 
 

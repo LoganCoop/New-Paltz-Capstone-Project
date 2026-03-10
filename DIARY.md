@@ -51,12 +51,38 @@
 
 ## (3/3/26)
 ### What I accomplished
-- 
-- 
-- 
-- 
+- Switched focus from Unity-only visualization to a dedicated Godot VR pipeline for Quest 3.
+- Set up the `li-dar/` Godot project structure for VR point cloud rendering.
+- Added initial VR scripts for UDP receive, point cloud visualization, and controller input.
+- Added project setup docs for Quest 3 deployment and testing.
 
 ### Next Steps
-- 
-- 
-- 
+- Validate full sensor-to-VR data flow (TFLuna + BNO055 -> UDP -> Quest 3 app).
+- Tune rendering and point density to keep stable FPS in-headset.
+- Continue documenting setup and troubleshooting notes.
+
+## (3/10/26)
+### What I added
+- Godot Quest 3 VR app assets and config in `li-dar/` (scene, scripts, shaders, materials, Android export files).
+- VR-specific scripts: `vr_init.gd`, `vr_hud_3d.gd`, and `debug_hud.gd` for startup and in-headset debugging.
+- Quest 3 deployment docs: `li-dar/QUEST3_VR_SETUP_GUIDE.md`, `li-dar/QUEST3_QUICK_START.md`, and `li-dar/deploy_to_quest3.ps1`.
+- Updated point cloud shader/material pipeline for better in-headset visualization.
+
+### Notes
+- Current visualization direction is Quest 3 VR-first (black background, non-passthrough) so scanning can be viewed in an isolated environment.
+- Python tooling and HAL remain the sensor source, with UDP bridging into the VR app.
+
+### Next Steps
+- Run end-to-end headset test with live UDP stream and record performance baseline.
+- Add save/export option for captured point clouds.
+- Refine VR interaction flow (controller toggles, reset, and debug HUD controls).
+
+## Presentation Out line (3/10/26)
+- Intro - begin by defining LiDAR and its uses
+- Build components - list out components used and then describe their various functions
+- Construction - describe the construction of the LiDAR scanner (wiring into the Raspberry Pi, CAD modeling, and printing/assembly.
+- Initial testing - talk about the raw data derived from each component
+- Sending data - talk about using UDP to send packets of data from the initial testing to the Unity/Godot environments
+- Point cloud - talk about generating point clouds from the data sent over from the scanner via UDP
+- VR capabilities - talk about how now that point clouds have been generated via a 2D interface like unity it can now be integrated with VR to make a more interactive point cloud with greater accuracy.
+- Conclusion - describe how point clouds can be useful and my overall experience building the LiDAR scanner system.

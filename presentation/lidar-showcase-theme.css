@@ -1,0 +1,232 @@
+/* @theme lidar-showcase */
+
+@import 'default';
+
+:root {
+  --bg: #f4f8fd;
+  --panel: #ffffff;
+  --ink: #112338;
+  --muted: #5e7288;
+  --brand: #0b5fff;
+  --brand-soft: #dbe9ff;
+  --teal: #0ea5a8;
+  --line: #d7e3f3;
+  --shadow: rgba(13, 37, 74, 0.12);
+}
+
+section {
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  background:
+    linear-gradient(180deg, rgba(245, 250, 255, 0.95) 0%, rgba(240, 246, 255, 0.95) 100%),
+    repeating-linear-gradient(0deg, transparent 0 28px, rgba(11, 95, 255, 0.035) 28px 29px),
+    repeating-linear-gradient(90deg, transparent 0 28px, rgba(11, 95, 255, 0.03) 28px 29px);
+  color: var(--ink);
+  padding: 56px 64px 48px 64px;
+  line-height: 1.28;
+}
+
+section::after {
+  content: attr(data-marpit-pagination) ' / ' attr(data-marpit-pagination-total);
+  color: var(--muted);
+  font-size: 14px;
+  right: 38px;
+  bottom: 20px;
+}
+
+h1 {
+  color: var(--ink);
+  font-size: 2.05em;
+  font-weight: 700;
+  margin-bottom: 0.2em;
+  letter-spacing: -0.018em;
+}
+
+h2 {
+  color: var(--brand);
+  font-size: 1.2em;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 0.35em;
+}
+
+h3 {
+  color: var(--teal);
+  font-size: 0.82em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.4em;
+}
+
+p, li, td, th {
+  font-size: 0.9em;
+}
+
+strong {
+  color: var(--ink);
+}
+
+small {
+  color: var(--muted);
+}
+
+ul, ol {
+  margin-top: 0.4em;
+}
+
+li {
+  margin: 0.2em 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 12px 28px var(--shadow);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+th {
+  background: linear-gradient(90deg, #0b5fff 0%, #0e7be7 100%);
+  color: white;
+  padding: 10px 14px;
+  text-align: left;
+}
+
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+code {
+  background: #e8f0ff;
+  color: #103266;
+  padding: 0.08em 0.28em;
+  border-radius: 6px;
+}
+
+pre {
+  border-radius: 14px;
+  border: 1px solid #dbe7fb;
+  box-shadow: 0 12px 28px var(--shadow);
+}
+
+pre code {
+  font-family: 'IBM Plex Mono', 'Consolas', monospace;
+  display: block;
+  background: #f8fbff;
+  color: #132c4a;
+  padding: 1.1em;
+  border-radius: 14px;
+}
+
+blockquote {
+  margin: 1em 0;
+  padding: 0.7em 1em;
+  border-left: 6px solid var(--brand);
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 0 12px 12px 0;
+}
+
+section.lead {
+  background:
+    linear-gradient(130deg, rgba(11, 26, 56, 0.98) 0%, rgba(11, 95, 255, 0.94) 56%, rgba(14, 123, 231, 0.92) 100%);
+  color: white;
+}
+
+section.lead h1,
+section.lead h2,
+section.lead h3,
+section.lead strong,
+section.lead small,
+section.lead p,
+section.lead li {
+  color: white;
+}
+
+section.lead::before {
+  content: '';
+  position: absolute;
+  right: 42px;
+  top: 36px;
+  width: 240px;
+  height: 240px;
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 70%);
+}
+
+section.section {
+  background:
+    linear-gradient(120deg, rgba(13, 31, 66, 0.96), rgba(11, 95, 255, 0.88));
+  color: white;
+}
+
+section.section h1,
+section.section h2,
+section.section h3,
+section.section p,
+section.section li,
+section.section strong {
+  color: white;
+}
+
+section.section::after {
+  color: rgba(255,255,255,0.7);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+}
+
+.panel {
+  background: rgba(255,255,255,0.94);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 12px 28px var(--shadow);
+}
+
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.metric {
+  background: rgba(255,255,255,0.95);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 12px 28px var(--shadow);
+}
+
+.metric strong {
+  display: block;
+  font-size: 1.6em;
+  color: var(--brand);
+  margin-bottom: 6px;
+}
+
+.callout {
+  background: linear-gradient(130deg, rgba(11,95,255,0.08), rgba(14,165,168,0.08));
+  border: 1px solid #cfe1ff;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-top: 14px;
+}
+
+.caption {
+  color: var(--muted);
+  font-size: 0.7em;
+  margin-top: 6px;
+}
+
+img {
+  border-radius: 18px;
+  box-shadow: 0 12px 28px var(--shadow);
+}

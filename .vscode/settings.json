@@ -1,0 +1,31 @@
+{
+  "markdown.marp.themes": [
+    "./presentation/lidar-showcase-theme.css"
+  ],
+  "markdown.marp.enableHtml": true,
+  "latex-workshop.latex.autoBuild.run": "onSave",
+  "latex-workshop.latex.outDir": "%DIR%",
+  "latex-workshop.latex.tools": [
+    {
+      "name": "pdflatex-miktex",
+      "command": "C:/Users/lpcoo/AppData/Local/Programs/MiKTeX/miktex/bin/x64/pdflatex.exe",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "-output-directory=%DIR%",
+        "%DOC%"
+      ]
+    }
+  ],
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "pdflatex x2 (MiKTeX)",
+      "tools": [
+        "pdflatex-miktex",
+        "pdflatex-miktex"
+      ]
+    }
+  ],
+  "latex-workshop.latex.recipe.default": "lastUsed"
+}

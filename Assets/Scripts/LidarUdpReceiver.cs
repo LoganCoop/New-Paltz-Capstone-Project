@@ -63,6 +63,12 @@ public class LidarUdpReceiver : MonoBehaviour
     public bool ignoreOrientation = false;
     public bool flipX = true;
     public bool flipY = true;
+    [Header("Coordinate Correction")]
+    public bool swapYAndZ = true;
+    public bool invertZ = true;
+    public float yawCorrectionDegrees = 90f;   // Rotate left by default.
+    public float pitchCorrectionDegrees = 0f;
+    public float rollCorrectionDegrees = 0f;
     public Gradient distanceGradient;
     public float minDistanceMeters = 0.1f;
     public float maxDistanceMeters = 5.0f;
@@ -284,6 +290,7 @@ public class LidarUdpReceiver : MonoBehaviour
             pos = new Vector3(current.pos_m[0], current.pos_m[1], current.pos_m[2]);
             if (flipX) pos.x = -pos.x;
             if (flipY) pos.y = -pos.y;
+            pos = ApplyCoordinateCorrection(pos);
             distanceMeters = pos.magnitude;
         }
         else
@@ -297,6 +304,7 @@ public class LidarUdpReceiver : MonoBehaviour
             pos = dir * distanceMeters;
             if (flipX) pos.x = -pos.x;
             if (flipY) pos.y = -pos.y;
+            pos = ApplyCoordinateCorrection(pos);
         }
 
         // Add point using mesh-based or GameObject-based system
@@ -422,6 +430,29 @@ public class LidarUdpReceiver : MonoBehaviour
         color.a = 1f;
         
         return color;
+    }
+
+    Vector3 ApplyCoordinateCorrection(Vector3 position)
+    {
+        if (swapYAndZ)
+        {
+            position = new Vector3(position.x, position.z, position.y);
+        }
+
+        if (invertZ)
+        {
+            position.z = -position.z;
+        }
+
+        if (!Mathf.Approximately(yawCorrectionDegrees, 0f) ||
+            !Mathf.Approximately(pitchCorrectionDegrees, 0f) ||
+            !Mathf.Approximately(rollCorrectionDegrees, 0f))
+        {
+            Quaternion correction = Quaternion.Euler(pitchCorrectionDegrees, yawCorrectionDegrees, rollCorrectionDegrees);
+            position = correction * position;
+        }
+
+        return position;
     }
     
     void ApplyDistanceColor(Transform point, float distanceMeters)

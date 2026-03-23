@@ -78,6 +78,24 @@
 - Add save/export option for captured point clouds.
 - Refine VR interaction flow (controller toggles, reset, and debug HUD controls).
 
+## (3/23/26)
+### What I accomplished
+- Fixed point cloud coordinate orientation in Unity (`LidarUdpReceiver.cs`) — point cloud now renders in first-person perspective instead of top-down.
+- Resolved left-right mirroring issue: scanner movement to the left now correctly plots points to the left.
+- Fine-tuned yaw correction offset iteratively from 90° → -90° → -135° → -180° based on live testing feedback.
+- Added right-click mouse drag orbit feature, allowing the camera to rotate around the point cloud interactively.
+- Fixed a Unity runtime crash (`InvalidOperationException`) caused by legacy `Input.*` API calls conflicting with the project's new Input System package — patched `HandleRightClickOrbit()` with a `#if ENABLE_INPUT_SYSTEM` / `#else` dual-path implementation using `Mouse.current`.
+
+### Current Working Settings (Unity Inspector)
+- Flip X: false, Flip Y: true
+- Swap Y And Z: true, Invert Z: true, Mirror Horizontal: true
+- Yaw Correction Degrees: -180
+- Enable Right Click Orbit: true, Orbit Sensitivity: 3.0
+
+### Next Steps
+- Run a full live scan test end-to-end (Pi → UDP → Unity) to validate orientation and controls.
+- Consider adding mouse wheel zoom and middle-click pan for fuller view control.
+
 ## Presentation Out line (3/10/26)
 - Intro - begin by defining LiDAR and its uses
 - Build components - list out components used and then describe their various functions

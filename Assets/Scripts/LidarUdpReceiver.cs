@@ -61,12 +61,13 @@ public class LidarUdpReceiver : MonoBehaviour
     public bool usePosField = true; // when true, use `pos_m` from UDP if present
     public bool debugOverlay = true;
     public bool ignoreOrientation = false;
-    public bool flipX = true;
+    public bool flipX = false;
     public bool flipY = true;
     [Header("Coordinate Correction")]
     public bool swapYAndZ = true;
     public bool invertZ = true;
-    public float yawCorrectionDegrees = 90f;   // Rotate left by default.
+    public bool mirrorHorizontal = true;
+    public float yawCorrectionDegrees = -180f; // Correct yaw direction and add another 45deg left offset.
     public float pitchCorrectionDegrees = 0f;
     public float rollCorrectionDegrees = 0f;
     public Gradient distanceGradient;
@@ -85,6 +86,11 @@ public class LidarUdpReceiver : MonoBehaviour
     [Header("Mesh-Based Rendering")]
     public bool useMeshRenderer = true;
     public Material pointCloudMaterial;
+    [Header("Mouse View Controls")]
+    public bool enableRightClickOrbit = true;
+    public float orbitSensitivity = 3.0f;
+    public float minOrbitPitch = -80.0f;
+    public float maxOrbitPitch = 80.0f;
 
     private UdpClient _client;
     private Thread _thread;
@@ -103,6 +109,7 @@ public class LidarUdpReceiver : MonoBehaviour
     private readonly List<float> _distanceSamples = new List<float>();
     private Quaternion _smoothedOrientation = Quaternion.identity;
     private bool _hasSmoothedOrientation;
+    private Vector2 _orbitAngles;
 
     // Mesh-based point cloud system
     private Mesh _pointCloudMesh;
@@ -119,6 +126,11 @@ public class LidarUdpReceiver : MonoBehaviour
 
     void Start()
     {
+        if (flipX)
+        {
+            Debug.LogWarning("LidarUdpReceiver: flipX is enabled, which mirrors left/right movement. Disable flipX for natural turning.");
+        }
+
         _client = new UdpClient(port);
         _client.Client.ReceiveTimeout = 250;
         _running = true;
@@ -131,6 +143,8 @@ public class LidarUdpReceiver : MonoBehaviour
         {
             InitializeMeshRenderer();
         }
+
+        _orbitAngles = new Vector2(transform.eulerAngles.x, transform.eulerAngles.y);
     }
     
     void InitializeMeshRenderer()
@@ -212,6 +226,8 @@ public class LidarUdpReceiver : MonoBehaviour
 
     void Update()
     {
+        HandleRightClickOrbit();
+
         // Visualize marker poses
         MarkerPacket markerPacket;
         lock (_lock)
@@ -328,6 +344,60 @@ public class LidarUdpReceiver : MonoBehaviour
                 }
             }
         }
+    }
+
+    void HandleRightClickOrbit()
+    {
+        if (!enableRightClickOrbit) return;
+
+#if ENABLE_INPUT_SYSTEM
+        var mouse = Mouse.current;
+        if (mouse == null) return;
+
+        if (mouse.rightButton.wasPressedThisFrame)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+
+        if (mouse.rightButton.isPressed)
+        {
+            Vector2 delta = mouse.delta.ReadValue() * orbitSensitivity;
+            _orbitAngles.y += delta.x;
+            _orbitAngles.x = Mathf.Clamp(_orbitAngles.x - delta.y, minOrbitPitch, maxOrbitPitch);
+
+            transform.rotation = Quaternion.Euler(_orbitAngles.x, _orbitAngles.y, 0f);
+        }
+
+        if (mouse.rightButton.wasReleasedThisFrame)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+#else
+        if (Input.GetMouseButtonDown(1))
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+
+        if (Input.GetMouseButton(1))
+        {
+            float mouseX = Input.GetAxis("Mouse X") * orbitSensitivity;
+            float mouseY = Input.GetAxis("Mouse Y") * orbitSensitivity;
+
+            _orbitAngles.y += mouseX;
+            _orbitAngles.x = Mathf.Clamp(_orbitAngles.x - mouseY, minOrbitPitch, maxOrbitPitch);
+
+            transform.rotation = Quaternion.Euler(_orbitAngles.x, _orbitAngles.y, 0f);
+        }
+
+        if (Input.GetMouseButtonUp(1))
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+#endif
     }
 
     void AddPointToMesh(Vector3 pos, float distanceMeters)
@@ -452,6 +522,13 @@ public class LidarUdpReceiver : MonoBehaviour
             position = correction * position;
         }
 
+        // Apply optional final left/right mirror correction for sensor frames that
+        // still appear horizontally inverted after axis remap and yaw correction.
+        if (mirrorHorizontal)
+        {
+            position.x = -position.x;
+        }
+
         return position;
     }
     
@@ -543,6 +620,9 @@ public class LidarUdpReceiver : MonoBehaviour
 
     void OnDestroy()
     {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
         _running = false;
         _client?.Close();
         if (_thread != null && _thread.IsAlive)

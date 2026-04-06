@@ -105,3 +105,13 @@
 - Point cloud - talk about generating point clouds from the data sent over from the scanner via UDP
 - VR capabilities - talk about how now that point clouds have been generated via a 2D interface like unity it can now be integrated with VR to make a more interactive point cloud with greater accuracy.
 - Conclusion - describe how point clouds can be useful and my overall experience building the LiDAR scanner system.
+
+## (4/6/26)
+### Notes
+- After further research, I found that the only reliable way to get proper close-up object scans is through the ArUco process using the Pi Camera 3.
+- With more work on the framework, I can get this workflow fully functional.
+- Current blocker: my Pi Camera 3 is still not working.
+
+### Next Steps
+- Purchase and install a replacement Pi Camera 3.
+- Resume and complete the small object scanning workflow once the new camera is in place.

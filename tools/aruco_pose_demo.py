@@ -30,7 +30,7 @@ def main():
     parser.add_argument(
         "--backend",
         choices=["picamera2", "opencv", "rpicam"],
-        default="rpicam",
+        default="opencv",
         help=(
             "Camera backend to use: 'picamera2', 'opencv' (VideoCapture),"
             " or 'rpicam' (VideoCapture pinned to a V4L2 device). Default: rpicam"

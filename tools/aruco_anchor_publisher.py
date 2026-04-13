@@ -23,13 +23,27 @@ def main():
     parser.add_argument("--marker-length", type=float, default=0.05, help="Marker side length in meters")
     parser.add_argument("--out", default=None, help="Output jsonl path (default: test_outputs/anchors_<ts>.jsonl)")
     parser.add_argument("--rate", type=float, default=5.0, help="Frames per second to check")
+    parser.add_argument(
+        "--backend",
+        choices=["picamera2", "opencv"],
+        default="picamera2",
+        help="Camera backend to use: 'picamera2' or 'opencv' (VideoCapture device)",
+    )
+    parser.add_argument(
+        "--device",
+        default="/dev/video0",
+        help="Video device path or numeric index for OpenCV backend (e.g. /dev/video0 or 0)",
+    )
     parser.add_argument("--display", action="store_true", help="Show detection preview")
     args = parser.parse_args()
 
+    # Try to import picamera2 if available; OpenCV fallback will be used if requested.
+    have_picamera2 = False
     try:
-        from picamera2 import Picamera2
-    except Exception as e:
-        raise SystemExit("picamera2 is required: sudo apt install -y python3-picamera2")
+        from picamera2 import Picamera2  # type: ignore
+        have_picamera2 = True
+    except Exception:
+        have_picamera2 = False
 
     try:
         import cv2
@@ -51,10 +65,37 @@ def main():
         ts = time.strftime("%Y%m%d_%H%M%S")
         out_path = out_dir / f"anchors_{ts}.jsonl"
 
-    camera = Picamera2()
-    config = camera.create_preview_configuration(main={"size": (1280, 720)})
-    camera.configure(config)
-    camera.start()
+    cap = None
+    camera = None
+    use_picamera2 = args.backend == "picamera2" and have_picamera2
+    use_opencv = args.backend == "opencv" or (args.backend == "picamera2" and not have_picamera2)
+
+    if use_picamera2:
+        camera = Picamera2()
+        config = camera.create_preview_configuration(main={"size": (1280, 720)})
+        camera.configure(config)
+        camera.start()
+    elif use_opencv:
+        device = args.device
+        try:
+            dev_index = int(device)
+        except Exception:
+            dev_index = device
+
+        api_preference = 0
+        if hasattr(cv2, "CAP_V4L2"):
+            api_preference = cv2.CAP_V4L2
+
+        try:
+            cap = cv2.VideoCapture(dev_index, api_preference)
+        except Exception:
+            cap = cv2.VideoCapture(dev_index)
+
+        try:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        except Exception:
+            pass
 
     dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
     detector = cv2.aruco.ArucoDetector(dictionary)
@@ -63,7 +104,24 @@ def main():
     with open(out_path, "a") as fh:
         try:
             while True:
-                frame = camera.capture_array()
+                if use_picamera2:
+                    frame = camera.capture_array()
+                else:
+                    ret, frame = cap.read()
+                    if not ret:
+                        print("Warning: failed to read frame from VideoCapture")
+                        time.sleep(interval)
+                        continue
+
+                if frame is None or frame.size == 0:
+                    print("Warning: Empty frame captured from camera.")
+                    time.sleep(interval)
+                    continue
+
+                # Convert 4-channel to 3-channel if necessary
+                if len(frame.shape) == 3 and frame.shape[2] == 4:
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 corners, ids, _ = detector.detectMarkers(gray)
                 rec = {"timestamp": time.time(), "markers": []}
@@ -94,7 +152,16 @@ def main():
                         break
                 time.sleep(interval)
         finally:
-            camera.stop()
+            if use_picamera2 and camera is not None:
+                try:
+                    camera.stop()
+                except Exception:
+                    pass
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
             if args.display:
                 cv2.destroyAllWindows()
 

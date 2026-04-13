@@ -58,6 +58,7 @@
 - Added project setup docs for Quest 3 deployment and testing.
 
 ### Next Steps
+<<<<<<< Updated upstream
 - Validate full sensor-to-VR data flow (TFLuna + BNO055 -> UDP -> Quest 3 app).
 - Tune rendering and point density to keep stable FPS in-headset.
 - Continue documenting setup and troubleshooting notes.
@@ -115,3 +116,22 @@
 ### Next Steps
 - Purchase and install a replacement Pi Camera 3.
 - Resume and complete the small object scanning workflow once the new camera is in place.
+=======
+- 
+- 
+- 
+
+## (4/13/26)
+### What I accomplished
+- Replaced Pi Camera 3 with Pi Camera Rev 1.3 and verified camera is working.
+### Plan / Next Steps (focus shift to ArUco)
+- Use ArUco markers for more accurate positioning and pointcloud alignment.
+- Capture new calibration images with the Rev 1.3 camera and run camera calibration.
+- Update ArUco scripts (`tools/aruco_pose_demo.py`, `tools/aruco_anchor_publisher.py`) to use the new calibration and camera device/backend.
+- Generate improved point clouds using marker-based poses and evaluate accuracy.
+- Print a set of ArUco markers for field testing and repeat calibration if needed.
+
+### Notes
+- Will prefer OpenCV VideoCapture or `picamera2` depending on environment; test both if necessary.
+- Next immediate action: capture calibration images and produce a `.npz` intrinsics file.
+>>>>>>> Stashed changes

@@ -109,6 +109,7 @@ public class LidarUdpReceiver : MonoBehaviour
     [Header("Mesh-Based Rendering")]
     public bool useMeshRenderer = true;
     public Material pointCloudMaterial;
+    public string preferredPointMaterialName = "PointCloudMaterial";
     [Header("Mouse View Controls")]
     public bool enableRightClickOrbit = true;
     public float orbitSensitivity = 3.0f;
@@ -195,9 +196,52 @@ public class LidarUdpReceiver : MonoBehaviour
         }
         else
         {
-            // Create a simple unlit material if none provided
-            _meshRenderer.material = new Material(Shader.Find("Unlit/Color"));
-            _meshRenderer.material.SetColor("_Color", Color.white);
+            // Try to load a named material from Resources (e.g. Resources/PointCloudMaterial.mat)
+            Material found = null;
+            try
+            {
+                found = Resources.Load<Material>(preferredPointMaterialName);
+            }
+            catch { }
+
+            // If not found, search all loaded materials for a likely candidate (Editor/runtime)
+            if (found == null)
+            {
+                var allMats = Resources.FindObjectsOfTypeAll<Material>();
+                foreach (var m in allMats)
+                {
+                    if (m == null) continue;
+                    var n = m.name.ToLowerInvariant();
+                    if (n.Contains("point") || n.Contains("pointcloud") || n.Contains("point_cloud") || n.Contains(preferredPointMaterialName.ToLowerInvariant()))
+                    {
+                        found = m;
+                        break;
+                    }
+                }
+            }
+
+            if (found != null)
+            {
+                _meshRenderer.material = found;
+            }
+            else
+            {
+                // Try to find the project point-cloud shader and create a material
+                var sh = Shader.Find("Custom/PointCloud");
+                if (sh != null)
+                {
+                    var mat = new Material(sh);
+                    mat.SetFloat("_PointSize", 5.0f);
+                    mat.SetFloat("_Brightness", 1.0f);
+                    _meshRenderer.material = mat;
+                }
+                else
+                {
+                    // Fallback to a simple unlit material
+                    _meshRenderer.material = new Material(Shader.Find("Unlit/Color"));
+                    _meshRenderer.material.SetColor("_Color", Color.white);
+                }
+            }
         }
     }
 
@@ -306,7 +350,7 @@ public class LidarUdpReceiver : MonoBehaviour
             }
         }
 
-        if (pointPrefab == null) return;
+        if (!useMeshRenderer && pointPrefab == null) return;
 
         Packet current;
         lock (_lock)

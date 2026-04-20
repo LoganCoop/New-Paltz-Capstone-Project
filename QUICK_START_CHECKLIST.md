@@ -72,12 +72,23 @@ Follow these steps in order. Check off each step as you complete it.
 #### Checkboxes:
 - [ ] ✅ Use Pos Field
 - [ ] ✅ Debug Overlay
-- [ ] ✅ Flip X
-- [ ] ✅ Flip Y
+- [ ] ✅ Data Already In Unity Frame
+- [ ] ⬜ Flip X
+- [ ] ⬜ Flip Y
+- [ ] ⬜ Swap Y And Z
+- [ ] ⬜ Invert Z
+- [ ] ⬜ Mirror Horizontal
 - [ ] ✅ Use Spatial Deduplication
 - [ ] **Voxel Size**: `0.03`
 - [ ] ✅ Use Mesh Renderer
 - [ ] **Point Cloud Material**: Drag from Materials folder
+
+#### Legacy correction values:
+- [ ] **Yaw Correction Degrees**: `0`
+- [ ] **Pitch Correction Degrees**: `0`
+- [ ] **Roll Correction Degrees**: `0`
+- [ ] **Apply Coordinate Correction To Fallback Direction**: unchecked
+- [ ] **Invert Fallback Vertical Axis**: unchecked
 
 ### Setup Camera:
 - [ ] Select `Main Camera` in Hierarchy
@@ -107,8 +118,9 @@ Follow these steps in order. Check off each step as you complete it.
   ```
   OR
   ```powershell
-  python tools/send_sensor_data_udp.py
+  python tools/send_sensor_data_udp.py --ip <QUEST_OR_PC_IP>
   ```
+- [ ] Keep the Python sender mount defaults unless you physically remount the IMU/LiDAR assembly.
 - [ ] Verify output shows "Sending UDP packets..."
 
 ## ☑️ Phase 7: First Test Run! (2 minutes)

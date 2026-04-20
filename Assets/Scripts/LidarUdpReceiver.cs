@@ -36,6 +36,7 @@ public class LidarUdpReceiver : MonoBehaviour
         public float[] pos_m;
         public ArucoData aruco;
         public ScannerPose scanner_pose;
+        public string frame;
     }
 
     [Serializable]
@@ -80,6 +81,8 @@ public class LidarUdpReceiver : MonoBehaviour
     public float scaleMeters = 0.01f;
     public float pointScale = 0.02f;
     public int maxPoints = 50000; // Increased for mesh-based system
+    [Header("Frame Integration")]
+    public bool dataAlreadyInUnityFrame = true;
     [Header("Position Source")]
     public bool usePosField = true; // when true, use `pos_m` from UDP if present
     public bool debugOverlay = true;
@@ -93,6 +96,9 @@ public class LidarUdpReceiver : MonoBehaviour
     public float yawCorrectionDegrees = -180f; // Correct yaw direction and add another 45deg left offset.
     public float pitchCorrectionDegrees = 0f;
     public float rollCorrectionDegrees = 0f;
+    [Header("Orientation Fallback")]
+    public bool applyCoordinateCorrectionToFallbackDirection = false;
+    public bool invertFallbackVerticalAxis = false;
     public Gradient distanceGradient;
     public float minDistanceMeters = 0.1f;
     public float maxDistanceMeters = 5.0f;
@@ -110,6 +116,10 @@ public class LidarUdpReceiver : MonoBehaviour
     public bool useMeshRenderer = true;
     public Material pointCloudMaterial;
     public string preferredPointMaterialName = "PointCloudMaterial";
+    [Header("Marker Visualization")]
+    public bool visualizeMarkers = false;
+    public Transform markerPrefab;
+    public float markerScale = 0.05f;
     [Header("Mouse View Controls")]
     public bool enableRightClickOrbit = true;
     public float orbitSensitivity = 3.0f;
@@ -134,6 +144,8 @@ public class LidarUdpReceiver : MonoBehaviour
     private Quaternion _smoothedOrientation = Quaternion.identity;
     private bool _hasSmoothedOrientation;
     private Vector2 _orbitAngles;
+    private string _lastPositionSource = "none";
+    private string _lastFrameMode = "unknown";
 
     // Mesh-based point cloud system
     private Mesh _pointCloudMesh;
@@ -148,9 +160,32 @@ public class LidarUdpReceiver : MonoBehaviour
     private HashSet<Vector3Int> _occupiedVoxels = new HashSet<Vector3Int>();
     private Dictionary<Vector3Int, int> _voxelToVertexIndex = new Dictionary<Vector3Int, int>();
 
+    void Awake()
+    {
+        // Initialize the point-cloud mesh before first render so a primitive source mesh
+        // (e.g., Sphere) does not flash when entering Play mode.
+        if (useMeshRenderer)
+        {
+            InitializeMeshRenderer();
+        }
+    }
+
     void Start()
     {
-        if (flipX)
+        if (dataAlreadyInUnityFrame)
+        {
+            bool legacyCorrectionsEnabled = flipX || flipY || swapYAndZ || invertZ || mirrorHorizontal ||
+                !Mathf.Approximately(yawCorrectionDegrees, 0f) ||
+                !Mathf.Approximately(pitchCorrectionDegrees, 0f) ||
+                !Mathf.Approximately(rollCorrectionDegrees, 0f) ||
+                applyCoordinateCorrectionToFallbackDirection ||
+                invertFallbackVerticalAxis;
+            if (legacyCorrectionsEnabled)
+            {
+                Debug.Log("LidarUdpReceiver: dataAlreadyInUnityFrame is enabled, so legacy axis correction toggles are ignored.");
+            }
+        }
+        else if (flipX)
         {
             Debug.LogWarning("LidarUdpReceiver: flipX is enabled, which mirrors left/right movement. Disable flipX for natural turning.");
         }
@@ -161,12 +196,6 @@ public class LidarUdpReceiver : MonoBehaviour
         _thread = new Thread(ReceiveLoop) { IsBackground = true };
         _thread.Start();
         _mpb = new MaterialPropertyBlock();
-        
-        // Initialize mesh-based point cloud system
-        if (useMeshRenderer)
-        {
-            InitializeMeshRenderer();
-        }
 
         _orbitAngles = new Vector2(transform.eulerAngles.x, transform.eulerAngles.y);
     }
@@ -308,28 +337,33 @@ public class LidarUdpReceiver : MonoBehaviour
     {
         HandleRightClickOrbit();
 
-        // Visualize marker poses
-        MarkerPacket markerPacket;
-        lock (_lock)
+        // Visualize marker poses only when explicitly enabled.
+        if (visualizeMarkers)
         {
-            markerPacket = _latestMarkerPacket;
-        }
-        if (markerPacket != null && markerPacket.markers != null)
-        {
-            foreach (var marker in markerPacket.markers)
+            MarkerPacket markerPacket;
+            lock (_lock)
             {
-                Vector3 markerPos = new Vector3(marker.tvec[0], marker.tvec[1], marker.tvec[2]);
-                Transform markerObj;
-                if (!_markerObjects.TryGetValue(marker.id, out markerObj) || markerObj == null)
+                markerPacket = _latestMarkerPacket;
+            }
+
+            Transform activeMarkerPrefab = markerPrefab != null ? markerPrefab : pointPrefab;
+            if (activeMarkerPrefab != null && markerPacket != null && markerPacket.markers != null)
+            {
+                foreach (var marker in markerPacket.markers)
                 {
-                    markerObj = Instantiate(pointPrefab, markerPos, Quaternion.identity);
-                    markerObj.SetParent(transform, false);
-                    markerObj.localScale = Vector3.one * pointScale;
-                    _markerObjects[marker.id] = markerObj;
-                }
-                else
-                {
-                    markerObj.position = markerPos;
+                    Vector3 markerPos = new Vector3(marker.tvec[0], marker.tvec[1], marker.tvec[2]);
+                    Transform markerObj;
+                    if (!_markerObjects.TryGetValue(marker.id, out markerObj) || markerObj == null)
+                    {
+                        markerObj = Instantiate(activeMarkerPrefab, markerPos, Quaternion.identity);
+                        markerObj.SetParent(transform, false);
+                        markerObj.localScale = Vector3.one * markerScale;
+                        _markerObjects[marker.id] = markerObj;
+                    }
+                    else
+                    {
+                        markerObj.position = markerPos;
+                    }
                 }
             }
         }
@@ -364,7 +398,10 @@ public class LidarUdpReceiver : MonoBehaviour
 
         if (!IsTimestampAligned(current.tfluna.timestamp, current.bno055.timestamp)) return;
 
-        var q = new Quaternion(current.bno055.qx, current.bno055.qy, current.bno055.qz, current.bno055.qw);
+        bool packetIsUnityFrame = dataAlreadyInUnityFrame || string.Equals(current.frame, "unity", StringComparison.OrdinalIgnoreCase);
+        _lastFrameMode = packetIsUnityFrame ? "unity" : "legacy";
+
+        var q = GetPacketOrientation(current);
         if (_hasCalibration)
         {
             q = _calibration * q;
@@ -384,33 +421,42 @@ public class LidarUdpReceiver : MonoBehaviour
         // Prefer scanner_pose.position if present, then `pos_m`, then TF-Luna fallback
         if (current.scanner_pose != null && current.scanner_pose.position != null && current.scanner_pose.position.Length >= 3)
         {
+            _lastPositionSource = "scanner_pose.position";
             pos = new Vector3(current.scanner_pose.position[0], current.scanner_pose.position[1], current.scanner_pose.position[2]);
-            // Note: scanner_pose is expected to be in meters in the camera/aruco frame.
-            if (flipX) pos.x = -pos.x;
-            if (flipY) pos.y = -pos.y;
-            pos = ApplyCoordinateCorrection(pos);
+            pos = packetIsUnityFrame ? pos : ApplyLegacyPositionCorrection(pos);
             distanceMeters = pos.magnitude;
         }
-        else if (current.pos_m != null && current.pos_m.Length >= 3)
+        else if (usePosField && current.pos_m != null && current.pos_m.Length >= 3)
         {
+            _lastPositionSource = "pos_m";
             pos = new Vector3(current.pos_m[0], current.pos_m[1], current.pos_m[2]);
-            if (flipX) pos.x = -pos.x;
-            if (flipY) pos.y = -pos.y;
-            pos = ApplyCoordinateCorrection(pos);
+            pos = packetIsUnityFrame ? pos : ApplyLegacyPositionCorrection(pos);
             distanceMeters = pos.magnitude;
         }
         else
         {
+            _lastPositionSource = "quaternion_fallback";
             var dir = ignoreOrientation ? Vector3.forward : (q * Vector3.forward);
             float rawDistanceMeters = current.tfluna.distance_cm * scaleMeters;
             float filteredDistanceMeters = FilterDistance(rawDistanceMeters);
             if (Mathf.Abs(rawDistanceMeters - filteredDistanceMeters) > maxDistanceJumpMeters) return;
 
+            if (!packetIsUnityFrame && invertFallbackVerticalAxis)
+            {
+                dir.y = -dir.y;
+            }
+
             distanceMeters = filteredDistanceMeters;
             pos = dir * distanceMeters;
-            if (flipX) pos.x = -pos.x;
-            if (flipY) pos.y = -pos.y;
-            pos = ApplyCoordinateCorrection(pos);
+            if (!packetIsUnityFrame)
+            {
+                if (flipX) pos.x = -pos.x;
+                if (flipY) pos.y = -pos.y;
+                if (applyCoordinateCorrectionToFallbackDirection)
+                {
+                    pos = ApplyCoordinateCorrection(pos);
+                }
+            }
         }
 
         // Add point using mesh-based or GameObject-based system
@@ -434,6 +480,24 @@ public class LidarUdpReceiver : MonoBehaviour
                 }
             }
         }
+    }
+
+    Quaternion GetPacketOrientation(Packet current)
+    {
+        if (current.scanner_pose != null && current.scanner_pose.orientation != null)
+        {
+            var orientation = current.scanner_pose.orientation;
+            return new Quaternion(orientation.qx, orientation.qy, orientation.qz, orientation.qw);
+        }
+
+        return new Quaternion(current.bno055.qx, current.bno055.qy, current.bno055.qz, current.bno055.qw);
+    }
+
+    Vector3 ApplyLegacyPositionCorrection(Vector3 pos)
+    {
+        if (flipX) pos.x = -pos.x;
+        if (flipY) pos.y = -pos.y;
+        return ApplyCoordinateCorrection(pos);
     }
 
     void HandleRightClickOrbit()
@@ -685,17 +749,19 @@ public class LidarUdpReceiver : MonoBehaviour
         GUI.Label(new Rect(10, 10, 600, 20), "UDP packets: " + count);
         GUI.Label(new Rect(10, 30, 600, 20), "Last packet: " + lastSeen + " ago");
         GUI.Label(new Rect(10, 50, 600, 20), "Last sender: " + (sender ?? "n/a"));
+        GUI.Label(new Rect(10, 70, 600, 20), "Position source: " + _lastPositionSource);
+        GUI.Label(new Rect(10, 90, 600, 20), "Frame mode: " + _lastFrameMode);
         
         if (useMeshRenderer)
         {
-            GUI.Label(new Rect(10, 70, 600, 20), "Point count: " + _vertices.Count + " / " + maxPoints);
-            GUI.Label(new Rect(10, 90, 600, 20), "Unique voxels: " + _occupiedVoxels.Count);
-            GUI.Label(new Rect(10, 110, 600, 20), "Mode: Mesh-based (optimized)");
+            GUI.Label(new Rect(10, 110, 600, 20), "Point count: " + _vertices.Count + " / " + maxPoints);
+            GUI.Label(new Rect(10, 130, 600, 20), "Unique voxels: " + _occupiedVoxels.Count);
+            GUI.Label(new Rect(10, 150, 600, 20), "Mode: Mesh-based (optimized)");
         }
         else
         {
-            GUI.Label(new Rect(10, 70, 600, 20), "Point count: " + transform.childCount);
-            GUI.Label(new Rect(10, 90, 600, 20), "Mode: GameObject-based (legacy)");
+            GUI.Label(new Rect(10, 110, 600, 20), "Point count: " + transform.childCount);
+            GUI.Label(new Rect(10, 130, 600, 20), "Mode: GameObject-based (legacy)");
         }
     }
 

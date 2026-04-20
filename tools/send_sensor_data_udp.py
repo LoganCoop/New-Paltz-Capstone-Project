@@ -19,6 +19,8 @@ DEFAULT_BNO055_RATE_HZ = 10.0
 DEFAULT_UDP_PORT = 5005
 DEFAULT_SEND_RATE_HZ = 20.0
 DEFAULT_TF_LUNA_OFFSET = (0.0, 0.0, 0.0)
+DEFAULT_MOUNT_EULER_DEGREES = (-90.0, 0.0, 0.0)
+DEFAULT_BEAM_AXIS = (0.0, 0.0, 1.0)
 
 
 def quat_conjugate(q):
@@ -41,6 +43,46 @@ def rotate_vector_by_quat(q, v):
     qv = (0.0, v[0], v[1], v[2])
     qc = quat_conjugate(q)
     return quat_mul(quat_mul(q, qv), qc)[1:]
+
+
+def normalize_quat(q):
+    w, x, y, z = q
+    norm = math.sqrt(w * w + x * x + y * y + z * z)
+    if norm == 0:
+        return (1.0, 0.0, 0.0, 0.0)
+    return (w / norm, x / norm, y / norm, z / norm)
+
+
+def quat_from_euler_degrees(roll_deg, pitch_deg, yaw_deg):
+    roll = math.radians(roll_deg) * 0.5
+    pitch = math.radians(pitch_deg) * 0.5
+    yaw = math.radians(yaw_deg) * 0.5
+
+    cr = math.cos(roll)
+    sr = math.sin(roll)
+    cp = math.cos(pitch)
+    sp = math.sin(pitch)
+    cy = math.cos(yaw)
+    sy = math.sin(yaw)
+
+    return normalize_quat((
+        cr * cp * cy + sr * sp * sy,
+        sr * cp * cy - cr * sp * sy,
+        cr * sp * cy + sr * cp * sy,
+        cr * cp * sy - sr * sp * cy,
+    ))
+
+
+def rotate_vector_by_mount(mount_q, vector):
+    return rotate_vector_by_quat(mount_q, vector)
+
+
+def convert_sensor_quat_to_unity(sensor_q, mount_q):
+    return normalize_quat(quat_mul(quat_mul(mount_q, sensor_q), quat_conjugate(mount_q)))
+
+
+def convert_sensor_vector_to_unity(vector, mount_q):
+    return rotate_vector_by_mount(mount_q, vector)
 
 
 def read_tfluna(port_path, baud, timeout, result_dict):
@@ -127,10 +169,18 @@ def main():
     parser.add_argument("--aruco-port", type=int, default=6006, help="UDP port to listen for ArUco detector packets (default 6006)")
     parser.add_argument("--simulate", action="store_true", help="Simulate sensors (no hardware required)")
     parser.add_argument("--fusion-alpha", type=float, default=0.2, help="EMA alpha for scanner_pose smoothing (0-1)")
+    parser.add_argument("--mount-roll", type=float, default=DEFAULT_MOUNT_EULER_DEGREES[0], help="Fixed sensor-to-Unity roll offset in degrees")
+    parser.add_argument("--mount-pitch", type=float, default=DEFAULT_MOUNT_EULER_DEGREES[1], help="Fixed sensor-to-Unity pitch offset in degrees")
+    parser.add_argument("--mount-yaw", type=float, default=DEFAULT_MOUNT_EULER_DEGREES[2], help="Fixed sensor-to-Unity yaw offset in degrees")
+    parser.add_argument("--beam-axis", nargs=3, type=float, default=list(DEFAULT_BEAM_AXIS), help="Beam direction in the sensor local frame")
     args = parser.parse_args()
 
     bno_address = int(args.bno_address, 16)
     send_interval = 1.0 / max(args.send_rate, 0.1)
+    mount_q = quat_from_euler_degrees(args.mount_roll, args.mount_pitch, args.mount_yaw)
+    beam_axis_sensor = tuple(args.beam_axis)
+    beam_axis_unity = convert_sensor_vector_to_unity(beam_axis_sensor, mount_q)
+    offset_unity = convert_sensor_vector_to_unity(tuple(args.offset), mount_q)
 
     data = {}
     # Ensure Blinka uses the requested I2C bus
@@ -205,7 +255,8 @@ def main():
     print(f"Sending UDP packets to {args.ip}:{args.udp_port}")
     while True:
         if 'tfluna' in data and 'bno055' in data:
-            # compute world-space point from TF-Luna distance and BNO055 quaternion
+            # Convert the entire pose stream into Unity world coordinates here so
+            # the receiver can render without axis swaps or sign-flip heuristics.
             try:
                 distance_cm = data['tfluna'].get('distance_cm')
                 dist_m = float(distance_cm) / 100.0
@@ -213,26 +264,33 @@ def main():
                 qx = data['bno055'].get('qx')
                 qy = data['bno055'].get('qy')
                 qz = data['bno055'].get('qz')
-                norm = math.sqrt(qw * qw + qx * qx + qy * qy + qz * qz)
-                if norm == 0:
-                    q = (1.0, 0.0, 0.0, 0.0)
-                else:
-                    q = (qw / norm, qx / norm, qy / norm, qz / norm)
+                q_sensor = normalize_quat((qw, qx, qy, qz))
+                q_unity = convert_sensor_quat_to_unity(q_sensor, mount_q)
 
-                local_v = (0.0, 0.0, dist_m)
-                world_v = rotate_vector_by_quat(q, local_v)
-                ox, oy, oz = args.offset
-                pos_m = [world_v[0] + ox, world_v[1] + oy, world_v[2] + oz]
+                world_v = rotate_vector_by_quat(q_unity, beam_axis_unity)
+                pos_m = [
+                    world_v[0] * dist_m + offset_unity[0],
+                    world_v[1] * dist_m + offset_unity[1],
+                    world_v[2] * dist_m + offset_unity[2],
+                ]
             except Exception:
                 pos_m = None
                 dist_m = None
+                q_unity = (1.0, 0.0, 0.0, 0.0)
 
             packet = {
                 'tfluna': data['tfluna'],
-                'bno055': data['bno055'],
+                'bno055': {
+                    'timestamp': data['bno055'].get('timestamp', time.time()),
+                    'qw': q_unity[0],
+                    'qx': q_unity[1],
+                    'qy': q_unity[2],
+                    'qz': q_unity[3],
+                },
                 'aruco': data.get('aruco'),
                 'dist_m': dist_m,
                 'pos_m': pos_m,
+                'frame': 'unity',
             }
             # Build a simple scanner_pose combining ArUco position (if available)
             # and IMU orientation from BNO055. Position uses the first detected
@@ -244,16 +302,19 @@ def main():
                 # orientation from BNO055
                 b = data.get('bno055')
                 if b is not None:
-                    bw = float(b.get('qw', 1.0))
-                    bx = float(b.get('qx', 0.0))
-                    by = float(b.get('qy', 0.0))
-                    bz = float(b.get('qz', 0.0))
-                    n = math.sqrt(bw * bw + bx * bx + by * by + bz * bz)
-                    if n == 0:
-                        bw, bx, by, bz = 1.0, 0.0, 0.0, 0.0
-                    else:
-                        bw, bx, by, bz = bw / n, bx / n, by / n, bz / n
-                    orientation = {'qw': bw, 'qx': bx, 'qy': by, 'qz': bz}
+                    sensor_orientation = normalize_quat((
+                        float(b.get('qw', 1.0)),
+                        float(b.get('qx', 0.0)),
+                        float(b.get('qy', 0.0)),
+                        float(b.get('qz', 0.0)),
+                    ))
+                    unity_orientation = convert_sensor_quat_to_unity(sensor_orientation, mount_q)
+                    orientation = {
+                        'qw': unity_orientation[0],
+                        'qx': unity_orientation[1],
+                        'qy': unity_orientation[2],
+                        'qz': unity_orientation[3],
+                    }
                 else:
                     orientation = None
 
@@ -266,12 +327,15 @@ def main():
                         m = markers[0]
                         tvec = m.get('tvec')
                         if tvec and len(tvec) >= 3:
-                            # ArUco tvec is typically in meters in the camera frame.
-                            position = [float(tvec[0]), float(tvec[1]), float(tvec[2])]
+                            # Convert camera/body-frame position into Unity's frame once.
+                            position = list(convert_sensor_vector_to_unity((
+                                float(tvec[0]),
+                                float(tvec[1]),
+                                float(tvec[2]),
+                            ), mount_q))
 
-                            # If we have IMU orientation, rotate the camera-frame
-                            # ArUco tvec into the world/IMU frame as a simple
-                            # extrinsic approximation.
+                            # If we have IMU orientation, rotate the local-frame ArUco
+                            # position into the Unity world frame with the converted quaternion.
                             if orientation is not None:
                                 q = (orientation['qw'], orientation['qx'], orientation['qy'], orientation['qz'])
                                 try:

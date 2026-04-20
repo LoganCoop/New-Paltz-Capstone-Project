@@ -184,6 +184,11 @@ public class LidarUdpReceiver : MonoBehaviour
             {
                 Debug.Log("LidarUdpReceiver: dataAlreadyInUnityFrame is enabled, so legacy axis correction toggles are ignored.");
             }
+
+            if (!usePosField)
+            {
+                Debug.Log("LidarUdpReceiver: Use Pos Field is disabled, but Unity-frame mode will still consume pos_m when available.");
+            }
         }
         else if (flipX)
         {
@@ -426,7 +431,7 @@ public class LidarUdpReceiver : MonoBehaviour
             pos = packetIsUnityFrame ? pos : ApplyLegacyPositionCorrection(pos);
             distanceMeters = pos.magnitude;
         }
-        else if (usePosField && current.pos_m != null && current.pos_m.Length >= 3)
+        else if (current.pos_m != null && current.pos_m.Length >= 3)
         {
             _lastPositionSource = "pos_m";
             pos = new Vector3(current.pos_m[0], current.pos_m[1], current.pos_m[2]);

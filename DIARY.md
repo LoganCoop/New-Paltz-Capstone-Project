@@ -163,3 +163,24 @@
 ### Notes
 - Defaults were set to I2C bus 3 to match the new hardware wiring; use `--i2c-bus` to override if needed.
 
+### Additional work completed later on 4/20/26
+- Fixed an unexpected Unity startup sphere by preventing runtime marker visualization from spawning the point prefab unless marker rendering is explicitly enabled.
+- Moved mesh initialization earlier in the Unity lifecycle so the receiver no longer flashes a primitive mesh at startup.
+- Refactored the sensor-to-Unity frame handling so `tools/send_sensor_data_udp.py` now owns the main coordinate conversion and tags outgoing packets as Unity-frame data.
+- Simplified `Assets/Scripts/LidarUdpReceiver.cs` so Unity consumes already-converted packet data instead of relying on stacked flip/swap corrections.
+- Added Unity-frame trim and inversion controls for fast live testing while keeping the legacy correction path separated.
+- Added debug overlay lines in Unity to show `Position source`, `Frame mode`, and `Pose mode` during live tests.
+- Fixed a regression where valid `pos_m` endpoint data could be skipped, causing a blank view even though UDP packets were arriving.
+- Corrected the scanner semantics so tracked ArUco pose is treated as the scanner origin and the actual plotted point is the measured endpoint in front of the scanner.
+- Resolved the "horizontal cylinder around the user" issue by preferring endpoint data (`pos_m`) over scanner origin data when plotting the point cloud.
+
+### Current understanding after live testing on 4/20/26
+- ArUco markers are actively used when the camera-side detector is running and sending packets into `tools/send_sensor_data_udp.py` on the configured ArUco UDP port.
+- ArUco improves accuracy by providing a tracked scanner origin that reduces IMU-only drift and makes first-person room/object scanning more reliable.
+- If ArUco is not available, the system falls back to IMU orientation plus TF-Luna distance, which is enough for orientation-driven plotting but is less accurate for real spatial alignment.
+
+### Next steps after today's fixes
+- Run another live scan with ArUco visible in the camera feed and confirm the Unity overlay reports the expected position source and pose mode.
+- Measure and tune the physical beam/mount alignment only if remaining error is consistent after ArUco-assisted scanning.
+- Once the scan behavior is stable, remove or hide the remaining legacy Unity correction controls to reduce misconfiguration risk.
+

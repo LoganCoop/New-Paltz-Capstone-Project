@@ -135,3 +135,31 @@
 - Will prefer OpenCV VideoCapture or `picamera2` depending on environment; test both if necessary.
 - Next immediate action: capture calibration images and produce a `.npz` intrinsics file.
 >>>>>>> Stashed changes
+
+## (4/20/26)
+### What I accomplished
+- Updated BNO055 I2C usage to default to bus 3 and added `--i2c-bus` to relevant tools.
+- Integrated ArUco marker output with the UDP sensor sender: `tools/send_sensor_data_udp.py` now listens for ArUco packets (default port 6006) and includes marker data in outgoing UDP packets to Unity.
+- Made ArUco detector UDP destination configurable (`tools/aruco_pose_demo.py` now defaults to sending to localhost:6006).
+
+### Final status (4/20/26, after live testing)
+- Rewired BNO055 to I2C bus 1 and updated defaults to use bus 1. All IMU reads validated on bus 1.
+- Started headless ArUco detector (Picamera2) feeding the local aggregator on port 6006.
+- Implemented a simple `scanner_pose` fusion in `tools/send_sensor_data_udp.py` combining ArUco position (first marker `tvec`) with BNO055 orientation (normalized quaternion). Outgoing UDP packets now include `scanner_pose` with `position` and `orientation` fields.
+- Verified outgoing UDP packets to Unity (192.168.0.198:5005) contain `tfluna`, `bno055`, `aruco`, and the new `scanner_pose` field.
+
+### Next steps / Improvements to consider
+- Smooth `scanner_pose` over time (exponential moving average or complementary filter).
+- Transform ArUco `tvec` from camera frame into the IMU/world frame using measured extrinsics.
+- Average or robustly select among multiple detected markers for a more stable position.
+- Add timestamp alignment logic and small buffer to better fuse asynchronous sensor updates.
+- Add a `--fusion-mode` flag to `tools/send_sensor_data_udp.py` to toggle simple vs. smoothed fusion.
+
+### Next steps / Test plan
+- Run the ArUco detector and the sensor UDP sender together: start `tools/send_sensor_data_udp.py` (pointing to Unity IP) and run `tools/aruco_pose_demo.py` to feed marker data to it.
+- Verify fused packets arriving in Unity contain `aruco` field with markers and that IMU/TF-Luna fields remain present.
+- If OK, perform a live scan and note results in this diary.
+
+### Notes
+- Defaults were set to I2C bus 3 to match the new hardware wiring; use `--i2c-bus` to override if needed.
+

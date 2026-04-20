@@ -5,6 +5,8 @@ import json
 import math
 import argparse
 import serial
+import sys
+import os
 import board
 import busio
 import adafruit_bno055
@@ -72,20 +74,39 @@ def read_tfluna(port_path, baud, timeout, result_dict):
 
 
 def read_bno055(result_dict, address, rate_hz):
-    i2c = busio.I2C(board.SCL, board.SDA)
-    sensor = adafruit_bno055.BNO055_I2C(i2c, address=address)
+    # Robust initialization: retry until device responds
     interval = 1.0 / max(rate_hz, 0.1)
+    sensor = None
+    while sensor is None:
+        try:
+            i2c = busio.I2C(board.SCL, board.SDA)
+            sensor = adafruit_bno055.BNO055_I2C(i2c, address=address)
+        except Exception as e:
+            print("BNO055 init error, retrying:", e, file=sys.stderr)
+            time.sleep(1.0)
+
+    # Read loop: catch and continue on transient read errors
     while True:
-        quat = sensor.quaternion
-        if quat is not None:
-            w, x, y, z = quat
-            result_dict['bno055'] = {
-                'timestamp': time.time(),
-                'qw': w,
-                'qx': x,
-                'qy': y,
-                'qz': z
-            }
+        try:
+            quat = sensor.quaternion
+            if quat is not None:
+                w, x, y, z = quat
+                result_dict['bno055'] = {
+                    'timestamp': time.time(),
+                    'qw': w,
+                    'qx': x,
+                    'qy': y,
+                    'qz': z
+                }
+        except Exception as e:
+            print("BNO055 read error (will retry):", e, file=sys.stderr)
+            # attempt to recreate sensor on repeated errors
+            try:
+                i2c = busio.I2C(board.SCL, board.SDA)
+                sensor = adafruit_bno055.BNO055_I2C(i2c, address=address)
+            except Exception:
+                # if reinit fails, sleep and retry later
+                time.sleep(1.0)
         time.sleep(interval)
 
 
@@ -102,25 +123,83 @@ def main():
     parser.add_argument("--bno-rate", type=float, default=DEFAULT_BNO055_RATE_HZ, help="BNO055 sample rate in Hz")
     parser.add_argument("--send-rate", type=float, default=DEFAULT_SEND_RATE_HZ, help="UDP send rate in Hz")
     parser.add_argument("--offset", nargs=3, type=float, default=list(DEFAULT_TF_LUNA_OFFSET), help="XYZ sensor offset in meters")
+    parser.add_argument("--i2c-bus", type=int, default=1, help="I2C bus number (default 1)")
+    parser.add_argument("--aruco-port", type=int, default=6006, help="UDP port to listen for ArUco detector packets (default 6006)")
+    parser.add_argument("--simulate", action="store_true", help="Simulate sensors (no hardware required)")
+    parser.add_argument("--fusion-alpha", type=float, default=0.2, help="EMA alpha for scanner_pose smoothing (0-1)")
     args = parser.parse_args()
 
     bno_address = int(args.bno_address, 16)
     send_interval = 1.0 / max(args.send_rate, 0.1)
 
     data = {}
-    # Start sensor threads
-    t1 = threading.Thread(
-        target=read_tfluna,
-        args=(args.tfluna_port, args.tfluna_baud, args.tfluna_timeout, data),
-        daemon=True,
-    )
-    t2 = threading.Thread(
-        target=read_bno055,
-        args=(data, bno_address, args.bno_rate),
-        daemon=True,
-    )
-    t1.start()
-    t2.start()
+    # Ensure Blinka uses the requested I2C bus
+    os.environ.setdefault("I2C_BUS", str(args.i2c_bus))
+
+    # Start ArUco UDP listener to receive marker detections from the camera process
+    def aruco_listener(port, result_dict):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.bind(("", port))
+        except Exception as e:
+            print(f"Failed to bind ArUco listener on port {port}: {e}", file=sys.stderr)
+            return
+        sock.settimeout(0.5)
+        while True:
+            try:
+                data_bytes, addr = sock.recvfrom(65536)
+                try:
+                    pkt = json.loads(data_bytes.decode('utf-8'))
+                    result_dict['aruco'] = pkt
+                except Exception:
+                    continue
+            except socket.timeout:
+                continue
+            except Exception as e:
+                print("ArUco listener error:", e, file=sys.stderr)
+
+    t_aruco = threading.Thread(target=aruco_listener, args=(args.aruco_port, data), daemon=True)
+    t_aruco.start()
+    # Start sensor threads (or simulated sensors)
+    if not args.simulate:
+        t1 = threading.Thread(
+            target=read_tfluna,
+            args=(args.tfluna_port, args.tfluna_baud, args.tfluna_timeout, data),
+            daemon=True,
+        )
+        t2 = threading.Thread(
+            target=read_bno055,
+            args=(data, bno_address, args.bno_rate),
+            daemon=True,
+        )
+        t1.start()
+        t2.start()
+    else:
+        def simulate_sensors(result_dict, rate_hz):
+            import random
+
+            interval = 1.0 / max(rate_hz, 0.1)
+            while True:
+                # simulate TF-Luna frame
+                result_dict['tfluna'] = {
+                    'timestamp': time.time(),
+                    'distance_cm': 100 + random.uniform(-5.0, 5.0),
+                    'strength': 100,
+                    'temp_c': 25.0,
+                }
+                # simulate BNO055 quaternion (identity-ish with small noise)
+                result_dict['bno055'] = {
+                    'timestamp': time.time(),
+                    'qw': 1.0,
+                    'qx': random.uniform(-0.01, 0.01),
+                    'qy': random.uniform(-0.01, 0.01),
+                    'qz': random.uniform(-0.01, 0.01),
+                }
+                time.sleep(interval)
+
+        t_sim = threading.Thread(target=simulate_sensors, args=(data, args.bno_rate), daemon=True)
+        t_sim.start()
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     print(f"Sending UDP packets to {args.ip}:{args.udp_port}")
@@ -151,10 +230,85 @@ def main():
             packet = {
                 'tfluna': data['tfluna'],
                 'bno055': data['bno055'],
+                'aruco': data.get('aruco'),
                 'dist_m': dist_m,
                 'pos_m': pos_m,
             }
+            # Build a simple scanner_pose combining ArUco position (if available)
+            # and IMU orientation from BNO055. Position uses the first detected
+            # marker tvec (meters) when present, otherwise falls back to the
+            # TF-Luna-derived `pos_m`. Orientation uses the normalized
+            # BNO055 quaternion.
+            scanner_pose = None
+            try:
+                # orientation from BNO055
+                b = data.get('bno055')
+                if b is not None:
+                    bw = float(b.get('qw', 1.0))
+                    bx = float(b.get('qx', 0.0))
+                    by = float(b.get('qy', 0.0))
+                    bz = float(b.get('qz', 0.0))
+                    n = math.sqrt(bw * bw + bx * bx + by * by + bz * bz)
+                    if n == 0:
+                        bw, bx, by, bz = 1.0, 0.0, 0.0, 0.0
+                    else:
+                        bw, bx, by, bz = bw / n, bx / n, by / n, bz / n
+                    orientation = {'qw': bw, 'qx': bx, 'qy': by, 'qz': bz}
+                else:
+                    orientation = None
+
+                # position from ArUco marker if available
+                ar = data.get('aruco')
+                position = None
+                if ar and isinstance(ar, dict):
+                    markers = ar.get('markers') or ar.get('marker_data') or []
+                    if markers and len(markers) > 0:
+                        m = markers[0]
+                        tvec = m.get('tvec')
+                        if tvec and len(tvec) >= 3:
+                            # ArUco tvec is typically in meters in the camera frame.
+                            position = [float(tvec[0]), float(tvec[1]), float(tvec[2])]
+
+                            # If we have IMU orientation, rotate the camera-frame
+                            # ArUco tvec into the world/IMU frame as a simple
+                            # extrinsic approximation.
+                            if orientation is not None:
+                                q = (orientation['qw'], orientation['qx'], orientation['qy'], orientation['qz'])
+                                try:
+                                    rp = rotate_vector_by_quat(q, (position[0], position[1], position[2]))
+                                    position = [rp[0], rp[1], rp[2]]
+                                except Exception:
+                                    pass
+
+                # fallback to TF-Luna-derived pos_m
+                if position is None and pos_m is not None:
+                    position = pos_m
+
+                # Apply simple exponential moving average smoothing to
+                # reduce jitter in the reported scanner_pose.
+                alpha = max(0.0, min(1.0, args.fusion_alpha))
+                prev = data.get('scanner_pose_smoothed')
+                smoothed = None
+                if position is not None:
+                    if prev and isinstance(prev, dict) and prev.get('position'):
+                        pp = prev.get('position')
+                        smoothed = [alpha * position[i] + (1.0 - alpha) * pp[i] for i in range(3)]
+                    else:
+                        smoothed = position
+                    # store for next iteration
+                    data['scanner_pose_smoothed'] = {'position': smoothed, 'timestamp': time.time()}
+
+                scanner_pose = {
+                    'timestamp': time.time(),
+                    'position': smoothed if smoothed is not None else None,
+                    'orientation': orientation,
+                }
+            except Exception:
+                scanner_pose = None
+
+            packet['scanner_pose'] = scanner_pose
             msg = json.dumps(packet).encode('utf-8')
+            print("Sending packet:", json.dumps(packet))
             sock.sendto(msg, (args.ip, args.udp_port))
         time.sleep(send_interval)
 

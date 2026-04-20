@@ -1,4 +1,5 @@
 import argparse
+import os
 import json
 import math
 import socket
@@ -76,6 +77,7 @@ def main():
     parser.add_argument("--baud", type=int, default=115200, help="TF-Luna baud rate")
     parser.add_argument("--timeout", type=float, default=1.0, help="Serial timeout seconds")
     parser.add_argument("--address", default="0x29", help="BNO055 I2C address (hex)")
+    parser.add_argument("--i2c-bus", type=int, default=1, help="I2C bus number (default 1)")
     parser.add_argument("--imu-rate", type=float, default=30.0, help="IMU sample rate Hz")
     parser.add_argument("--no-pos", dest="include_pos", action="store_false", help="Do not compute/include world-space position in payload")
     parser.add_argument("--offset", nargs=3, type=float, default=[0.0, 0.0, 0.0], help="xyz offset (meters) from IMU frame to TF-Luna emitter")
@@ -92,6 +94,7 @@ def main():
     if args.point_file:
         point_fp = open(args.point_file, "a")
 
+    os.environ.setdefault("I2C_BUS", str(args.i2c_bus))
     i2c = busio.I2C(board.SCL, board.SDA)
     sensor = adafruit_bno055.BNO055_I2C(i2c, address=address)
 

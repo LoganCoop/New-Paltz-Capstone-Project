@@ -34,6 +34,29 @@ public class LidarUdpReceiver : MonoBehaviour
         public Tfluna tfluna;
         public Bno055 bno055;
         public float[] pos_m;
+        public ArucoData aruco;
+        public ScannerPose scanner_pose;
+    }
+
+    [Serializable]
+    public class ArucoData
+    {
+        public double timestamp;
+        public List<Marker> markers;
+    }
+
+    [Serializable]
+    public class ScannerPose
+    {
+        public double timestamp;
+        public float[] position;
+        public Orientation orientation;
+    }
+
+    [Serializable]
+    public class Orientation
+    {
+        public float qw, qx, qy, qz;
     }
 
     [Serializable]
@@ -197,6 +220,19 @@ public class LidarUdpReceiver : MonoBehaviour
                         _lastPacketTicks = DateTime.UtcNow.Ticks;
                         _lastSender = endPoint.ToString();
                     }
+                    // If the packet contains embedded aruco data, mirror it into the
+                    // marker packet structure used elsewhere in this class so marker
+                    // visualization continues to work as before.
+                    if (packet.aruco != null && packet.aruco.markers != null && packet.aruco.markers.Count > 0)
+                    {
+                        var mp = new MarkerPacket();
+                        mp.timestamp = packet.aruco.timestamp;
+                        mp.markers = packet.aruco.markers;
+                        lock (_lock)
+                        {
+                            _latestMarkerPacket = mp;
+                        }
+                    }
                 }
                 else
                 {
@@ -301,7 +337,17 @@ public class LidarUdpReceiver : MonoBehaviour
 
         Vector3 pos;
         float distanceMeters;
-        if (current.pos_m != null && current.pos_m.Length >= 3)
+        // Prefer scanner_pose.position if present, then `pos_m`, then TF-Luna fallback
+        if (current.scanner_pose != null && current.scanner_pose.position != null && current.scanner_pose.position.Length >= 3)
+        {
+            pos = new Vector3(current.scanner_pose.position[0], current.scanner_pose.position[1], current.scanner_pose.position[2]);
+            // Note: scanner_pose is expected to be in meters in the camera/aruco frame.
+            if (flipX) pos.x = -pos.x;
+            if (flipY) pos.y = -pos.y;
+            pos = ApplyCoordinateCorrection(pos);
+            distanceMeters = pos.magnitude;
+        }
+        else if (current.pos_m != null && current.pos_m.Length >= 3)
         {
             pos = new Vector3(current.pos_m[0], current.pos_m[1], current.pos_m[2]);
             if (flipX) pos.x = -pos.x;

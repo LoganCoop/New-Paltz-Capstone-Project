@@ -8,6 +8,7 @@ Usage: python3 tools/aruco_anchor_publisher.py --calib camera.npz --marker-lengt
 import argparse
 import json
 import time
+import socket
 from pathlib import Path
 
 def load_calibration(path):
@@ -35,6 +36,8 @@ def main():
         help="Video device path or numeric index for OpenCV backend (e.g. /dev/video0 or 0)",
     )
     parser.add_argument("--display", action="store_true", help="Show detection preview")
+    parser.add_argument("--ip", default=None, help="Destination UDP IP to send anchor packets (optional)")
+    parser.add_argument("--udp-port", type=int, default=5005, help="Destination UDP port")
     args = parser.parse_args()
 
     # Try to import picamera2 if available; OpenCV fallback will be used if requested.
@@ -101,6 +104,11 @@ def main():
     detector = cv2.aruco.ArucoDetector(dictionary)
 
     interval = 1.0 / max(args.rate, 0.1)
+
+    sock = None
+    if args.ip:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
     with open(out_path, "a") as fh:
         try:
             while True:
@@ -143,6 +151,14 @@ def main():
 
                 fh.write(json.dumps(rec) + "\n")
                 fh.flush()
+
+                # Send over UDP if requested
+                if sock is not None:
+                    try:
+                        msg = json.dumps(rec).encode("utf-8")
+                        sock.sendto(msg, (args.ip, args.udp_port))
+                    except Exception as e:
+                        print("Warning: failed to send UDP packet:", e)
 
                 if args.display:
                     if ids is not None and len(ids) > 0:

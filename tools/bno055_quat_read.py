@@ -1,5 +1,6 @@
 import argparse
 import time
+import os
 
 import board
 import busio
@@ -10,11 +11,14 @@ def main():
     parser = argparse.ArgumentParser(description="Read BNO055 quaternion output over I2C.")
     parser.add_argument("--address", default="0x29", help="I2C address (hex), default 0x29")
     parser.add_argument("--rate", type=float, default=10.0, help="Output rate in Hz")
+    parser.add_argument("--i2c-bus", type=int, default=1, help="I2C bus number (default 1)")
     args = parser.parse_args()
 
     address = int(args.address, 16)
     interval = 1.0 / max(args.rate, 0.1)
 
+    # Allow selecting the Linux I2C bus via environment for Adafruit Blinka
+    os.environ.setdefault("I2C_BUS", str(args.i2c_bus))
     i2c = busio.I2C(board.SCL, board.SDA)
     sensor = adafruit_bno055.BNO055_I2C(i2c, address=address)
 

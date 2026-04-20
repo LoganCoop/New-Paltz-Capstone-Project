@@ -13,6 +13,7 @@ Usage examples:
 
 """
 import argparse
+import os
 import json
 import math
 import socket
@@ -144,6 +145,7 @@ def main():
     parser.add_argument("--timeout", type=float, default=1.0)
     parser.add_argument("--imu-address", default="0x29")
     parser.add_argument("--imu-rate", type=float, default=30.0)
+    parser.add_argument("--i2c-bus", type=int, default=1, help="I2C bus number (default 1)")
     parser.add_argument("--unity-ip", help="Unity destination IP to send marker packets", default=None)
     parser.add_argument("--unity-port", type=int, default=5005)
     parser.add_argument("--listen-port", type=int, default=6006, help="UDP port to listen for marker triggers")
@@ -152,6 +154,9 @@ def main():
     args = parser.parse_args()
 
     address = int(args.imu_address, 16)
+
+    # Ensure Adafruit Blinka uses the requested I2C bus
+    os.environ.setdefault("I2C_BUS", str(args.i2c_bus))
 
     shared = {}
 

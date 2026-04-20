@@ -33,6 +33,7 @@ public class LidarUdpReceiver : MonoBehaviour
     {
         public Tfluna tfluna;
         public Bno055 bno055;
+        public float dist_m;
         public float[] pos_m;
         public ArucoData aruco;
         public ScannerPose scanner_pose;
@@ -52,6 +53,7 @@ public class LidarUdpReceiver : MonoBehaviour
         public double timestamp;
         public float[] position;
         public Orientation orientation;
+        public string position_mode;
     }
 
     [Serializable]
@@ -83,6 +85,12 @@ public class LidarUdpReceiver : MonoBehaviour
     public int maxPoints = 50000; // Increased for mesh-based system
     [Header("Frame Integration")]
     public bool dataAlreadyInUnityFrame = true;
+    public float unityFrameYawCorrectionDegrees = 0f;
+    public float unityFramePitchCorrectionDegrees = 0f;
+    public float unityFrameRollCorrectionDegrees = 0f;
+    public bool unityFrameInvertX = false;
+    public bool unityFrameInvertY = false;
+    public bool unityFrameInvertZ = false;
     [Header("Position Source")]
     public bool usePosField = true; // when true, use `pos_m` from UDP if present
     public bool debugOverlay = true;
@@ -146,6 +154,7 @@ public class LidarUdpReceiver : MonoBehaviour
     private Vector2 _orbitAngles;
     private string _lastPositionSource = "none";
     private string _lastFrameMode = "unknown";
+    private string _lastPoseMode = "unknown";
 
     // Mesh-based point cloud system
     private Mesh _pointCloudMesh;
@@ -423,24 +432,40 @@ public class LidarUdpReceiver : MonoBehaviour
 
         Vector3 pos;
         float distanceMeters;
-        // Prefer scanner_pose.position if present, then `pos_m`, then TF-Luna fallback
-        if (current.scanner_pose != null && current.scanner_pose.position != null && current.scanner_pose.position.Length >= 3)
-        {
-            _lastPositionSource = "scanner_pose.position";
-            pos = new Vector3(current.scanner_pose.position[0], current.scanner_pose.position[1], current.scanner_pose.position[2]);
-            pos = packetIsUnityFrame ? pos : ApplyLegacyPositionCorrection(pos);
-            distanceMeters = pos.magnitude;
-        }
-        else if (current.pos_m != null && current.pos_m.Length >= 3)
+        // Prefer endpoint data first. scanner_pose.position can be the tracked scanner
+        // origin, while pos_m is the measured hit point in front of the scanner.
+        if (current.pos_m != null && current.pos_m.Length >= 3)
         {
             _lastPositionSource = "pos_m";
+            _lastPoseMode = current.scanner_pose != null && !string.IsNullOrEmpty(current.scanner_pose.position_mode)
+                ? current.scanner_pose.position_mode
+                : "point";
             pos = new Vector3(current.pos_m[0], current.pos_m[1], current.pos_m[2]);
             pos = packetIsUnityFrame ? pos : ApplyLegacyPositionCorrection(pos);
+            if (packetIsUnityFrame)
+            {
+                pos = ApplyUnityFramePositionCorrection(pos);
+            }
+            distanceMeters = pos.magnitude;
+        }
+        else if (current.scanner_pose != null && current.scanner_pose.position != null && current.scanner_pose.position.Length >= 3)
+        {
+            _lastPositionSource = "scanner_pose.position";
+            _lastPoseMode = string.IsNullOrEmpty(current.scanner_pose.position_mode)
+                ? "unknown"
+                : current.scanner_pose.position_mode;
+            pos = new Vector3(current.scanner_pose.position[0], current.scanner_pose.position[1], current.scanner_pose.position[2]);
+            pos = packetIsUnityFrame ? pos : ApplyLegacyPositionCorrection(pos);
+            if (packetIsUnityFrame)
+            {
+                pos = ApplyUnityFramePositionCorrection(pos);
+            }
             distanceMeters = pos.magnitude;
         }
         else
         {
             _lastPositionSource = "quaternion_fallback";
+            _lastPoseMode = "fallback";
             var dir = ignoreOrientation ? Vector3.forward : (q * Vector3.forward);
             float rawDistanceMeters = current.tfluna.distance_cm * scaleMeters;
             float filteredDistanceMeters = FilterDistance(rawDistanceMeters);
@@ -461,6 +486,10 @@ public class LidarUdpReceiver : MonoBehaviour
                 {
                     pos = ApplyCoordinateCorrection(pos);
                 }
+            }
+            else
+            {
+                pos = ApplyUnityFramePositionCorrection(pos);
             }
         }
 
@@ -503,6 +532,27 @@ public class LidarUdpReceiver : MonoBehaviour
         if (flipX) pos.x = -pos.x;
         if (flipY) pos.y = -pos.y;
         return ApplyCoordinateCorrection(pos);
+    }
+
+    Vector3 ApplyUnityFramePositionCorrection(Vector3 pos)
+    {
+        if (unityFrameInvertX) pos.x = -pos.x;
+        if (unityFrameInvertY) pos.y = -pos.y;
+        if (unityFrameInvertZ) pos.z = -pos.z;
+
+        if (Mathf.Approximately(unityFrameYawCorrectionDegrees, 0f) &&
+            Mathf.Approximately(unityFramePitchCorrectionDegrees, 0f) &&
+            Mathf.Approximately(unityFrameRollCorrectionDegrees, 0f))
+        {
+            return pos;
+        }
+
+        Quaternion trim = Quaternion.Euler(
+            unityFramePitchCorrectionDegrees,
+            unityFrameYawCorrectionDegrees,
+            unityFrameRollCorrectionDegrees
+        );
+        return trim * pos;
     }
 
     void HandleRightClickOrbit()
@@ -756,17 +806,18 @@ public class LidarUdpReceiver : MonoBehaviour
         GUI.Label(new Rect(10, 50, 600, 20), "Last sender: " + (sender ?? "n/a"));
         GUI.Label(new Rect(10, 70, 600, 20), "Position source: " + _lastPositionSource);
         GUI.Label(new Rect(10, 90, 600, 20), "Frame mode: " + _lastFrameMode);
+        GUI.Label(new Rect(10, 110, 600, 20), "Pose mode: " + _lastPoseMode);
         
         if (useMeshRenderer)
         {
-            GUI.Label(new Rect(10, 110, 600, 20), "Point count: " + _vertices.Count + " / " + maxPoints);
-            GUI.Label(new Rect(10, 130, 600, 20), "Unique voxels: " + _occupiedVoxels.Count);
-            GUI.Label(new Rect(10, 150, 600, 20), "Mode: Mesh-based (optimized)");
+            GUI.Label(new Rect(10, 130, 600, 20), "Point count: " + _vertices.Count + " / " + maxPoints);
+            GUI.Label(new Rect(10, 150, 600, 20), "Unique voxels: " + _occupiedVoxels.Count);
+            GUI.Label(new Rect(10, 170, 600, 20), "Mode: Mesh-based (optimized)");
         }
         else
         {
-            GUI.Label(new Rect(10, 110, 600, 20), "Point count: " + transform.childCount);
-            GUI.Label(new Rect(10, 130, 600, 20), "Mode: GameObject-based (legacy)");
+            GUI.Label(new Rect(10, 130, 600, 20), "Point count: " + transform.childCount);
+            GUI.Label(new Rect(10, 150, 600, 20), "Mode: GameObject-based (legacy)");
         }
     }
 

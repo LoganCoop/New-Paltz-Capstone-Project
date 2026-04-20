@@ -292,11 +292,9 @@ def main():
                 'pos_m': pos_m,
                 'frame': 'unity',
             }
-            # Build a simple scanner_pose combining ArUco position (if available)
-            # and IMU orientation from BNO055. Position uses the first detected
-            # marker tvec (meters) when present, otherwise falls back to the
-            # TF-Luna-derived `pos_m`. Orientation uses the normalized
-            # BNO055 quaternion.
+            # Build scanner pose from tracked origin when available. The actual
+            # plotted endpoint remains `pos_m`, which is the measured hit point
+            # in front of the scanner.
             scanner_pose = None
             try:
                 # orientation from BNO055
@@ -321,32 +319,36 @@ def main():
                 # position from ArUco marker if available
                 ar = data.get('aruco')
                 position = None
+                position_mode = 'point'
                 if ar and isinstance(ar, dict):
                     markers = ar.get('markers') or ar.get('marker_data') or []
                     if markers and len(markers) > 0:
                         m = markers[0]
                         tvec = m.get('tvec')
                         if tvec and len(tvec) >= 3:
-                            # Convert camera/body-frame position into Unity's frame once.
+                            # Treat ArUco position as the scanner origin in Unity space.
                             position = list(convert_sensor_vector_to_unity((
                                 float(tvec[0]),
                                 float(tvec[1]),
                                 float(tvec[2]),
                             ), mount_q))
+                            position_mode = 'origin'
 
-                            # If we have IMU orientation, rotate the local-frame ArUco
-                            # position into the Unity world frame with the converted quaternion.
-                            if orientation is not None:
+                            # When tracked origin is available, the endpoint should be
+                            # origin + oriented beam * measured distance.
+                            if pos_m is not None and dist_m is not None and orientation is not None:
                                 q = (orientation['qw'], orientation['qx'], orientation['qy'], orientation['qz'])
-                                try:
-                                    rp = rotate_vector_by_quat(q, (position[0], position[1], position[2]))
-                                    position = [rp[0], rp[1], rp[2]]
-                                except Exception:
-                                    pass
+                                beam_world = rotate_vector_by_quat(q, beam_axis_unity)
+                                pos_m = [
+                                    position[0] + beam_world[0] * dist_m,
+                                    position[1] + beam_world[1] * dist_m,
+                                    position[2] + beam_world[2] * dist_m,
+                                ]
 
                 # fallback to TF-Luna-derived pos_m
                 if position is None and pos_m is not None:
                     position = pos_m
+                    position_mode = 'point'
 
                 # Apply simple exponential moving average smoothing to
                 # reduce jitter in the reported scanner_pose.
@@ -366,6 +368,7 @@ def main():
                     'timestamp': time.time(),
                     'position': smoothed if smoothed is not None else None,
                     'orientation': orientation,
+                    'position_mode': position_mode,
                 }
             except Exception:
                 scanner_pose = None

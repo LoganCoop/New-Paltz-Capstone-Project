@@ -90,6 +90,14 @@ Follow these steps in order. Check off each step as you complete it.
 - [ ] **Apply Coordinate Correction To Fallback Direction**: unchecked
 - [ ] **Invert Fallback Vertical Axis**: unchecked
 
+#### Unity-frame trim (when data is inverted):
+- [ ] **Unity Frame Invert X**: checked *(for left/right reversed)*
+- [ ] **Unity Frame Invert Y**: checked *(for up/down reversed)*
+- [ ] **Unity Frame Invert Z**: unchecked
+- [ ] **Unity Frame Yaw Correction Degrees**: `0`
+- [ ] **Unity Frame Pitch Correction Degrees**: `0`
+- [ ] **Unity Frame Roll Correction Degrees**: `180` *(use this when both left/right and up/down are inverted)*
+
 ### Setup Camera:
 - [ ] Select `Main Camera` in Hierarchy
 - [ ] Position: `(0, 2, -3)`

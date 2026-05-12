@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LiDAR Capstone – Trifold Board</title>
+  <style>
+    /* ── Print Setup ──────────────────────────────── */
+    @page {
+      size: 11in 8.5in landscape;
+      margin: 0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f0f0f0;
+    }
+
+    /* Each panel is a full landscape page */
+    .page {
+      width: 11in;
+      height: 8.5in;
+      padding: 0.45in 0.55in 0.35in 0.55in;
+      page-break-after: always;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      background: #ffffff;
+    }
+
+    /* ── Color Themes ─────────────────────────────── */
+    .page.blue   { --accent: #1a4fa0; --light: #dce8fa; --text-on-accent: #fff; }
+    .page.teal   { --accent: #0d7377; --light: #d5f0f0; --text-on-accent: #fff; }
+    .page.navy   { --accent: #1b2a6b; --light: #dde2f7; --text-on-accent: #fff; }
+    .page.green  { --accent: #1c6e3d; --light: #d7f0e2; --text-on-accent: #fff; }
+    .page.purple { --accent: #5a2d82; --light: #ead6f7; --text-on-accent: #fff; }
+    .page.slate  { --accent: #2e4057; --light: #dce3ec; --text-on-accent: #fff; }
+    .page.rust   { --accent: #b53a1e; --light: #fce0d8; --text-on-accent: #fff; }
+    .page.indigo { --accent: #3a3acc; --light: #dcdcfa; --text-on-accent: #fff; }
+    .page.dark   { --accent: #1a1a2e; --light: #d8d8e8; --text-on-accent: #fff; }
+
+    /* ── Header Band ──────────────────────────────── */
+    .header {
+      background: var(--accent);
+      color: var(--text-on-accent);
+      border-radius: 8px 8px 0 0;
+      padding: 0.16in 0.24in 0.14in 0.24in;
+      display: flex;
+      align-items: baseline;
+      gap: 0.18in;
+    }
+    .header .num {
+      font-size: 2.1em;
+      font-weight: 900;
+      opacity: 0.6;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .header .title-block { flex: 1; }
+    .header .title-block h1 {
+      font-size: 1.7em;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: 0.01em;
+    }
+    .header .title-block .sub {
+      font-size: 0.92em;
+      opacity: 0.92;
+      font-weight: 400;
+      margin-top: 2px;
+    }
+    .header .badge {
+      background: rgba(255,255,255,0.22);
+      border: 1.5px solid rgba(255,255,255,0.5);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.82em;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    /* ── Body ─────────────────────────────────────── */
+    .body {
+      background: var(--light);
+      border-radius: 0 0 8px 8px;
+      flex: 1;
+      padding: 0.2in 0.22in;
+      display: flex;
+      flex-direction: column;
+      gap: 0.14in;
+      overflow: hidden;
+    }
+
+    /* ── Two Column Layout ────────────────────────── */
+    .cols {
+      display: flex;
+      gap: 0.18in;
+      flex: 1;
+      overflow: hidden;
+    }
+    .col { flex: 1; display: flex; flex-direction: column; gap: 0.12in; }
+    .col.wide { flex: 1.35; }
+    .col.narrow { flex: 0.65; }
+
+    /* ── Cards ────────────────────────────────────── */
+    .card {
+      background: #fff;
+      border-radius: 7px;
+      padding: 0.13in 0.16in;
+      border-left: 4px solid var(--accent);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .card h3 {
+      font-size: 0.92em;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+    .card p, .card li {
+      font-size: 0.9em;
+      line-height: 1.5;
+      color: #111;
+    }
+    .card ul { padding-left: 1.1em; }
+    .card ul li { margin-bottom: 2px; }
+
+    /* ── Callout ──────────────────────────────────── */
+    .callout {
+      background: var(--accent);
+      color: #fff;
+      border-radius: 7px;
+      padding: 0.1in 0.16in;
+      font-size: 0.92em;
+      line-height: 1.5;
+      font-style: italic;
+    }
+
+    /* ── Stat Row ─────────────────────────────────── */
+    .stats {
+      display: flex;
+      gap: 0.12in;
+    }
+    .stat {
+      background: #fff;
+      border-radius: 7px;
+      flex: 1;
+      padding: 0.1in 0.1in;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      border-top: 4px solid var(--accent);
+    }
+    .stat .big {
+      font-size: 1.7em;
+      font-weight: 900;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .stat .label {
+      font-size: 0.8em;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #333;
+      margin-top: 4px;
+    }
+
+    /* ── Table ────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84em;
+      background: #fff;
+      border-radius: 7px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    thead tr { background: var(--accent); color: #fff; }
+    thead th {
+      padding: 7px 10px;
+      text-align: left;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 0.9em;
+    }
+    tbody tr:nth-child(even) { background: var(--light); }
+    tbody td { padding: 6px 10px; color: #111; line-height: 1.4; }
+
+    /* ── Code Block ───────────────────────────────── */
+    pre {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      border-radius: 6px;
+      padding: 0.1in 0.14in;
+      font-size: 0.72em;
+      line-height: 1.5;
+      font-family: 'Consolas', 'Courier New', monospace;
+      overflow: hidden;
+      white-space: pre-wrap;
+    }
+    pre .kw  { color: #cba6f7; }
+    pre .val { color: #a6e3a1; }
+    pre .cmt { color: #6c7086; font-style: italic; }
+
+    /* ── Footer ───────────────────────────────────── */
+    .footer {
+      margin-top: 0.1in;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75em;
+      color: #666;
+    }
+
+    /* ── Divider ──────────────────────────────────── */
+    hr.rule {
+      border: none;
+      border-top: 1.5px solid var(--accent);
+      opacity: 0.25;
+      margin: 0.04in 0;
+    }
+
+    .system-diagram {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.12in;
+    }
+
+    .system-diagram svg {
+      width: 100%;
+      height: auto;
+      background: #fbfcff;
+      border-radius: 12px;
+      box-shadow: inset 0 0 0 1px rgba(26, 79, 160, 0.14), 0 3px 12px rgba(0,0,0,0.08);
+    }
+
+    .system-diagram .entity {
+      fill: #b7d6d8;
+      stroke: #3f7bff;
+      stroke-width: 2;
+    }
+
+    .system-diagram .process {
+      fill: #81c9c7;
+      stroke: #3f7bff;
+      stroke-width: 2;
+    }
+
+    .system-diagram .store-body,
+    .system-diagram .store-top {
+      fill: #f6a8b7;
+      stroke: #3f7bff;
+      stroke-width: 2;
+    }
+
+    .system-diagram .connector {
+      fill: none;
+      stroke: #3f7bff;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .system-diagram text {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      fill: #1f4956;
+      font-size: 17px;
+    }
+
+    .diagram-note {
+      display: flex;
+      gap: 0.14in;
+    }
+
+    .diagram-note .callout {
+      margin-top: 0;
+      flex: 1;
+    }
+
+    /* ── Screen preview spacing ───────────────────── */
+    @media screen {
+      body { padding: 0.3in; gap: 0.3in; display: flex; flex-direction: column; }
+      .page {
+        box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+        border-radius: 10px;
+        margin-bottom: 0.3in;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 1 – Introduction: What Is LiDAR?
+     ══════════════════════════════════════════════════════ -->
+<div class="page blue">
+  <div class="header">
+    <div class="num">01</div>
+    <div class="title-block">
+      <h1>What Is LiDAR?</h1>
+      <div class="sub">Understanding the core sensing technology behind this project</div>
+    </div>
+    <div class="badge">Introduction</div>
+  </div>
+  <div class="body">
+    <div class="cols">
+      <div class="col wide">
+        <div class="card">
+          <h3>Definition</h3>
+          <p><strong>LiDAR</strong> stands for <em>Light Detection and Ranging</em>. It works by emitting laser pulses and measuring the time it takes for each pulse to bounce back from a surface. That travel time is converted into a precise distance measurement — the same principle as sonar, but using light instead of sound.</p>
+        </div>
+        <div class="card">
+          <h3>How a Distance Reading Becomes a 3D Point</h3>
+          <ul>
+            <li>The sensor fires a laser and measures the round-trip time to the target.</li>
+            <li>Distance (d) is calculated: <strong>d = (c × t) / 2</strong></li>
+            <li>An orientation reading (from the IMU) provides a direction vector.</li>
+            <li>Together they place a point in 3D space: <strong>(x, y, z)</strong></li>
+            <li>Thousands of these points build a <strong>point cloud</strong> — a 3D map.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col narrow">
+        <div class="card">
+          <h3>Real-World Uses</h3>
+          <ul>
+            <li>Self-driving cars</li>
+            <li>Robotics &amp; navigation</li>
+            <li>Architecture &amp; surveying</li>
+            <li>Forestry &amp; geology</li>
+            <li>AR/VR spatial computing</li>
+            <li>Archaeology</li>
+          </ul>
+        </div>
+        <div class="callout">
+          This project makes LiDAR technology accessible at low cost using off-the-shelf components and custom software — from a $30 sensor to a live interactive 3D point cloud.
+        </div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="big">250Hz</div><div class="label">TF-Luna Sample Rate</div></div>
+      <div class="stat"><div class="big">0.2 – 8m</div><div class="label">Effective Range</div></div>
+      <div class="stat"><div class="big">±2cm</div><div class="label">Typical Accuracy</div></div>
+      <div class="stat"><div class="big">3D</div><div class="label">Output Point Cloud</div></div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Logan Cooper · SUNY New Paltz Capstone Project · 2026</span>
+    <span>Handheld LiDAR Scanner System</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 2 – Hardware Components
+     ══════════════════════════════════════════════════════ -->
+<div class="page teal">
+  <div class="header">
+    <div class="num">02</div>
+    <div class="title-block">
+      <h1>Hardware Components</h1>
+      <div class="sub">Every physical part of the scanner and what it contributes</div>
+    </div>
+    <div class="badge">Build</div>
+  </div>
+  <div class="body">
+    <table>
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>Purpose</th>
+          <th>Interface</th>
+          <th>Key Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>TF-Luna LiDAR</strong></td>
+          <td>Measures distance to targets via time-of-flight laser</td>
+          <td>UART (serial)</td>
+          <td>250 Hz, 0.2–8 m range, returns dist, signal strength &amp; temp</td>
+        </tr>
+        <tr>
+          <td><strong>BNO055 IMU</strong></td>
+          <td>Provides 9-DOF orientation as a quaternion for 3D point direction</td>
+          <td>I²C (bus 1)</td>
+          <td>On-board sensor fusion; outputs qw, qx, qy, qz directly</td>
+        </tr>
+        <tr>
+          <td><strong>Raspberry Pi 5</strong></td>
+          <td>Central compute — reads sensors, processes data, sends UDP</td>
+          <td>GPIO / USB</td>
+          <td>Runs Python tools, hosts the HAL, streams to visualization</td>
+        </tr>
+        <tr>
+          <td><strong>Pi Camera Rev 1.3</strong></td>
+          <td>Detects ArUco visual markers for precise scanner positioning</td>
+          <td>CSI ribbon</td>
+          <td>Replaced Pi Camera 3; used with OpenCV for pose estimation</td>
+        </tr>
+        <tr>
+          <td><strong>3D Printed Housing</strong></td>
+          <td>Holds all electronics in a stable handheld form factor</td>
+          <td>—</td>
+          <td>Designed in Rhino 3D; maintains sensor alignment during scans</td>
+        </tr>
+        <tr>
+          <td><strong>ArUco Markers (printed)</strong></td>
+          <td>Visual reference points in the environment to anchor the scanner</td>
+          <td>Camera</td>
+          <td>Reduce IMU drift; provide absolute position in the scene</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="cols" style="margin-top:0;">
+      <div class="col">
+        <div class="callout">
+          Each component was validated individually with isolated Python test scripts before the full system was integrated — reducing debugging time during assembly.
+        </div>
+      </div>
+      <div class="col">
+        <div class="card">
+          <h3>Total Component Cost</h3>
+          <p>All hardware was sourced affordably — TF-Luna (~$30), BNO055 breakout (~$10), Raspberry Pi 5 (~$80), Pi Camera (~$25). The system proves that capable spatial scanning does not require expensive commercial hardware.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Logan Cooper · SUNY New Paltz Capstone Project · 2026</span>
+    <span>Handheld LiDAR Scanner System</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 3 – Physical Construction
+     ══════════════════════════════════════════════════════ -->
+<div class="page navy">
+  <div class="header">
+    <div class="num">03</div>
+    <div class="title-block">
+      <h1>Physical Construction</h1>
+      <div class="sub">Wiring, CAD design, 3D printing, and final assembly</div>
+    </div>
+    <div class="badge">Construction</div>
+  </div>
+  <div class="body">
+    <div class="cols">
+      <div class="col">
+        <div class="card">
+          <h3>Wiring the Scanner</h3>
+          <ul>
+            <li><strong>TF-Luna → Pi UART:</strong> TX→RX (GPIO 14/15), 5 V power &amp; GND</li>
+            <li><strong>BNO055 → Pi I²C:</strong> SDA (GPIO 2), SCL (GPIO 3), 3.3 V &amp; GND</li>
+            <li><strong>Pi Camera:</strong> CSI ribbon connector to Pi 5 camera port</li>
+            <li>UART and I²C enabled in <code>raspi-config</code>; serial console disabled</li>
+            <li>User added to <code>dialout</code> group for serial port access</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>CAD &amp; 3D Printing</h3>
+          <ul>
+            <li>Housing modeled in <strong>Rhino 3D</strong> (.3dm files)</li>
+            <li>Designed to hold TF-Luna, BNO055, Pi 5, and camera together</li>
+            <li>Sensor alignment baked into the geometry — no re-calibration needed after assembly</li>
+            <li>Printed while software development ran in parallel to save time</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card">
+          <h3>Assembly Steps</h3>
+          <ul>
+            <li><strong>Step 1:</strong> Wire TF-Luna to Pi and validate with <code>tfluna_read.py</code></li>
+            <li><strong>Step 2:</strong> Wire BNO055 to Pi and validate with <code>bno055_quat_read.py</code></li>
+            <li><strong>Step 3:</strong> Connect Pi Camera and verify image capture</li>
+            <li><strong>Step 4:</strong> Run camera calibration, capture ArUco marker images</li>
+            <li><strong>Step 5:</strong> Install components into 3D printed housing</li>
+            <li><strong>Step 6:</strong> Re-run all sensor tests as an integrated unit</li>
+          </ul>
+        </div>
+        <div class="callout">
+          The housing was designed specifically so the LiDAR sensor, IMU, and camera maintain a fixed spatial relationship. This makes orientation math between sensors consistent and predictable.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Logan Cooper · SUNY New Paltz Capstone Project · 2026</span>
+    <span>Handheld LiDAR Scanner System</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 4 – Software Architecture
+     ══════════════════════════════════════════════════════ -->
+<div class="page green">
+  <div class="header">
+    <div class="num">04</div>
+    <div class="title-block">
+      <h1>Software Architecture</h1>
+      <div class="sub">Python tools, HAL interfaces, and the visualization stack</div>
+    </div>
+    <div class="badge">Software</div>
+  </div>
+  <div class="body">
+    <div class="cols">
+      <div class="col">
+        <div class="card">
+          <h3>Python Side (Raspberry Pi)</h3>
+          <ul>
+            <li><strong>HAL (Hardware Abstraction Layer)</strong> — clean interfaces that allow any sensor to be swapped or mocked without changing other code</li>
+            <li><strong>tfluna_read.py</strong> — UART reader for raw distance frames</li>
+            <li><strong>bno055_quat_read.py</strong> — I²C reader for quaternion orientation</li>
+            <li><strong>aruco_pose_demo.py</strong> — camera-based marker detection and pose estimation</li>
+            <li><strong>send_sensor_data_udp.py</strong> — fuses all sensor streams and broadcasts UDP packets</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Testing &amp; Mocking</h3>
+          <ul>
+            <li>All HAL interfaces have mock implementations for offline testing</li>
+            <li><code>tests/test_hal.py</code> verifies sensor logic without hardware</li>
+            <li>Mock output logs in <code>test_outputs/</code> used for data format validation</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card">
+          <h3>Visualization Side</h3>
+          <ul>
+            <li><strong>Unity (C#)</strong> — first rendering target, validated the full data pipeline; point cloud shader and UDP receiver</li>
+            <li><strong>Godot 4 (GDScript)</strong> — current VR rendering engine; Quest 3 deployment target</li>
+            <li>Custom GLSL point cloud shader for real-time rendering in both engines</li>
+            <li>VR HUD and debug overlay for in-headset diagnostics</li>
+          </ul>
+        </div>
+        <div class="callout">
+          The HAL design means the scanner's software can be tested on any computer — not just the Pi — which dramatically speeds up development and debugging cycles.
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:0">
+      <h3>Data Flow</h3>
+      <p style="font-family:monospace; font-size:0.78em; color:#222;">
+        TF-Luna (UART) ──→ Pi Python tools ──→ Coordinate transform ──→ UDP packet ──→ Unity receiver ──→ Point Cloud render
+        <br>
+        BNO055 (I²C) ────↗                  ArUco Camera ──────────────↗ (scanner origin fusion)
+      </p>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Logan Cooper · SUNY New Paltz Capstone Project · 2026</span>
+    <span>Handheld LiDAR Scanner System</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 5 – Initial Testing
+     ══════════════════════════════════════════════════════ -->
+<div class="page purple">
+  <div class="header">
+    <div class="num">05</div>
+    <div class="title-block">
+      <h1>Initial Testing</h1>
+      <div class="sub">Validating every component before full system integration</div>
+    </div>
+    <div class="badge">Testing</div>
+  </div>
+  <div class="body">
+    <div class="cols">
+      <div class="col">
+        <div class="card">
+          <h3>TF-Luna Raw Output</h3>
+          <pre><span class="cmt"># timestamp  dist_cm  strength  temp_c</span>
+1770662039.648  <span class="val">dist_cm=0</span>   strength=128  temp_c=39.00
+1770662039.658  <span class="val">dist_cm=0</span>   strength=128  temp_c=39.00
+1770662039.669  <span class="val">dist_cm=42</span>  strength=131  temp_c=39.00</pre>
+          <p style="font-size:0.75em; margin-top:6px;">Each frame includes a Unix timestamp, measured distance, return signal strength (quality), and on-chip temperature.</p>
+        </div>
+        <div class="card">
+          <h3>BNO055 Raw Output</h3>
+          <pre><span class="cmt"># timestamp  qw  qx  qy  qz</span>
+1770662963.567  <span class="val">qw=1.000</span> qx=0.000 qy=-0.000 qz=0.000
+1770662963.669  <span class="val">qw=0.368</span> qx=-0.492 qy=0.788 qz=0.000
+1770662963.771  <span class="val">qw=0.368</span> qx=-0.492 qy=0.788 qz=0.000</pre>
+          <p style="font-size:0.75em; margin-top:6px;">Quaternions describe full 3D orientation with no gimbal lock. The BNO055's internal fusion removes the need for manual Euler math.</p>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card">
+          <h3>Incremental Test Strategy</h3>
+          <ul>
+            <li>Each sensor tested in isolation before integration</li>
+            <li>Hardware faults caught early via per-component scripts</li>
+            <li>UDP stream validated before connecting to Unity</li>
+            <li>ArUco pipeline tested independently from IMU stream</li>
+            <li>Camera calibration verified with dedicated image capture tool</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>What the Test Logs Confirmed</h3>
+          <ul>
+            <li>TF-Luna delivering valid frames at full rate on UART</li>
+            <li>BNO055 producing normalized quaternions over I²C</li>
+            <li>ArUco detector resolving 3D pose from printed markers</li>
+            <li>UDP packets containing all expected fields arriving in Unity</li>
+          </ul>
+        </div>
+        <div class="callout">
+          Testing components separately first eliminated wiring and config issues early, so final integration debugging focused only on software logic.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Logan Cooper · SUNY New Paltz Capstone Project · 2026</span>
+    <span>Handheld LiDAR Scanner System</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 6 – Data Transmission (UDP)
+     ══════════════════════════════════════════════════════ -->
+<div class="page slate">
+  <div class="header">
+    <div class="num">06</div>
+    <div class="title-block">
+      <h1>Sending Data with UDP</h1>
+      <div class="sub">Bridging the Raspberry Pi scanner to the visualization environment in real time</div>
+    </div>
+    <div class="badge">Networking</div>
+  </div>
+  <div class="body">
+    <div class="cols">
+      <div class="col">
+        <div class="card">
+          <h3>Why UDP?</h3>
+          <ul>
+            <li><strong>Low overhead</strong> — no handshaking or connection state</li>
+            <li><strong>Low latency</strong> — packets arrive as fast as the network allows</li>
+            <li><strong>Fire-and-forget</strong> — acceptable if a few frames are dropped; point clouds are naturally tolerant of gaps</li>
+            <li><strong>Easy to receive</strong> — Unity and Python both have simple UDP socket APIs</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Packet Contents</h3>
+          <ul>
+            <li><strong>tfluna</strong> — distance (cm), signal strength, temperature</li>
+            <li><strong>bno055</strong> — quaternion orientation (qw, qx, qy, qz)</li>
+            <li><strong>aruco</strong> — detected marker IDs and pose vectors (when camera is active)</li>
+            <li><strong>scanner_pose</strong> — fused position (from ArUco) + orientation (from IMU)</li>
+            <li><strong>pos_m</strong> — final 3D endpoint in world space, ready to plot</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card">
+          <h3>Transmission Pipeline</h3>
+          <ul>
+            <li>Pi reads TF-Luna and BNO055 continuously</li>
+            <li>ArUco detector sends marker poses to local port 6006</li>
+            <li>Aggregator fuses all three streams into one JSON packet</li>
+            <li>Packet broadcast to visualization host on port 5005</li>
+            <li>Unity receiver parses JSON and queues the new point</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Frame Mode Tag</h3>
+          <p>Each packet includes a <strong>frame mode</strong> tag (<code>unity_frame</code> / <code>raw</code>) so the receiving engine knows whether coordinate conversion has already been applied by the Pi — eliminating double-correction bugs.</p>
+        </div>
+        <div class="callout">
+          The Pi owns the coordinate math. The visualization engine just plots what arrives — keeping the rendering side simple and engine-agnostic.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Logan Cooper · SUNY New Paltz Capstone Project · 2026</span>
+    <span>Handheld LiDAR Scanner System</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 7 – Point Cloud Generation
+     ══════════════════════════════════════════════════════ -->
+<div class="page rust">
+  <div class="header">
+    <div class="num">07</div>
+    <div class="title-block">
+      <h1>Point Cloud Generation</h1>
+      <div class="sub">Turning raw sensor samples into a navigable 3D spatial map</div>
+    </div>
+    <div class="badge">Point Cloud</div>
+  </div>
+  <div class="body">
+    <div class="cols">
+      <div class="col wide">
+        <div class="card">
+          <h3>How Each Point Is Computed</h3>
+          <ul>
+            <li><strong>1. Read distance</strong> — TF-Luna returns distance <em>d</em> to the nearest surface along the sensor axis.</li>
+            <li><strong>2. Read orientation</strong> — BNO055 returns a unit quaternion <em>q</em> describing where the scanner is pointing in 3D space.</li>
+            <li><strong>3. Build direction vector</strong> — rotate the scanner's forward vector (0, 0, 1) by <em>q</em> to get a world-space direction.</li>
+            <li><strong>4. Compute endpoint</strong> — multiply the direction vector by <em>d</em> to get the absolute 3D position of the detected surface.</li>
+            <li><strong>5. Accumulate</strong> — the new point is appended to the cloud buffer; the render engine draws all accumulated points each frame.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Coordinate System Challenges</h3>
+          <ul>
+            <li>TF-Luna, BNO055, and Unity each use different axis conventions</li>
+            <li>Iterative live testing was used to determine axis flips, swaps, and yaw offsets</li>
+            <li>Final calibrated settings: Flip Y, Swap Y↔Z, Invert Z, Yaw correction −180°</li>
+            <li>Frame mode tagging prevents double-correction between Pi and engine</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col narrow">
+        <div class="card">
+          <h3>Rendering</h3>
+          <ul>
+            <li>Custom GLSL point cloud shader</li>
+            <li>Points colored by depth or height</li>
+            <li>GPU-side rendering for performance</li>
+            <li>Renders in Unity in real time</li>
+          </ul>
+        </div>
+        <div class="callout">
+          ArUco markers improve accuracy by anchoring the scanner's 3D position. Without them, small IMU drift causes scans to "float" over time.
+        </div>
+        <div class="card">
+          <h3>Result</h3>
+          <p>A live, continuously growing 3D point cloud of the environment around the scanner — built in real time as you move the device.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Logan Cooper · SUNY New Paltz Capstone Project · 2026</span>
+    <span>Handheld LiDAR Scanner System</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 8 – System Diagram
+     ══════════════════════════════════════════════════════ -->
+<div class="page rust">
+  <div class="header">
+    <div class="num">08</div>
+    <div class="title-block">
+      <h1>System Diagram</h1>
+      <div class="sub">How sensing, transformation, networking, and rendering connect into one pipeline</div>
+    </div>
+    <div class="badge">Architecture</div>
+  </div>
+  <div class="body" style="justify-content:center;">
+    <div class="system-diagram">
+      <svg viewBox="0 0 1040 600" role="img" aria-label="LiDAR system data flow diagram">
+        <defs>
+          <marker id="arrow-rust" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#3f7bff"></path>
+          </marker>
+        </defs>
+
+        <rect class="entity" x="24" y="80" width="110" height="46" rx="10"></rect>
+        <text x="79" y="109" text-anchor="middle">Operator</text>
+
+        <rect class="entity" x="24" y="430" width="110" height="46" rx="10"></rect>
+        <text x="79" y="459" text-anchor="middle">Sensors</text>
+
+        <ellipse class="process" cx="395" cy="90" rx="120" ry="28"></ellipse>
+        <text x="395" y="96" text-anchor="middle">Scanner Control</text>
+
+        <ellipse class="process" cx="395" cy="210" rx="132" ry="30"></ellipse>
+        <text x="395" y="216" text-anchor="middle">Sensor Read Process</text>
+
+        <ellipse class="process" cx="395" cy="346" rx="132" ry="30"></ellipse>
+        <text x="395" y="352" text-anchor="middle">Pose Fusion Process</text>
+
+        <ellipse class="process" cx="395" cy="492" rx="142" ry="30"></ellipse>
+        <text x="395" y="498" text-anchor="middle">Point Cloud Rendering</text>
+
+        <rect class="store-body" x="820" y="38" width="130" height="98" rx="2"></rect>
+        <ellipse class="store-top" cx="885" cy="38" rx="65" ry="18"></ellipse>
+        <ellipse class="store-top" cx="885" cy="136" rx="65" ry="18" fill="#ef98aa"></ellipse>
+        <text x="885" y="46" text-anchor="middle">Control State</text>
+
+        <rect class="store-body" x="780" y="168" width="170" height="130" rx="2"></rect>
+        <ellipse class="store-top" cx="865" cy="168" rx="85" ry="22"></ellipse>
+        <ellipse class="store-top" cx="865" cy="298" rx="85" ry="22" fill="#ef98aa"></ellipse>
+        <text x="865" y="175" text-anchor="middle">Raw Scan Samples</text>
+
+        <rect class="store-body" x="810" y="330" width="140" height="104" rx="2"></rect>
+        <ellipse class="store-top" cx="880" cy="330" rx="70" ry="19"></ellipse>
+        <ellipse class="store-top" cx="880" cy="434" rx="70" ry="19" fill="#ef98aa"></ellipse>
+        <text x="880" y="337" text-anchor="middle">Pose Records</text>
+
+        <rect class="store-body" x="790" y="466" width="160" height="112" rx="2"></rect>
+        <ellipse class="store-top" cx="870" cy="466" rx="80" ry="21"></ellipse>
+        <ellipse class="store-top" cx="870" cy="578" rx="80" ry="21" fill="#ef98aa"></ellipse>
+        <text x="870" y="473" text-anchor="middle">Point Cloud Buffer</text>
+
+        <path class="connector" d="M 134 103 C 205 103, 250 95, 276 92" marker-end="url(#arrow-rust)"></path>
+        <path class="connector" d="M 134 103 C 205 115, 250 178, 263 205" marker-end="url(#arrow-rust)"></path>
+        <path class="connector" d="M 134 103 C 205 145, 244 430, 252 486" marker-end="url(#arrow-rust)"></path>
+
+        <path class="connector" d="M 134 453 C 205 453, 243 436, 257 358" marker-end="url(#arrow-rust)"></path>
+        <path class="connector" d="M 134 453 C 215 453, 238 483, 251 492" marker-end="url(#arrow-rust)"></path>
+
+        <path class="connector" d="M 515 90 C 635 90, 712 90, 820 64" marker-end="url(#arrow-rust)"></path>
+        <path class="connector" d="M 527 210 C 637 210, 701 210, 780 233" marker-end="url(#arrow-rust)"></path>
+        <path class="connector" d="M 527 346 C 636 346, 716 346, 810 382" marker-end="url(#arrow-rust)"></path>
+        <path class="connector" d="M 537 492 C 634 492, 708 500, 790 520" marker-end="url(#arrow-rust)"></path>
+
+        <path class="connector" d="M 820 120 C 714 130, 618 180, 515 205" marker-end="url(#arrow-rust)"></path>
+        <path class="connector" d="M 790 520 C 708 512, 618 438, 515 358" marker-end="url(#arrow-rust)"></path>
+        <path class="connector" d="M 810 382 C 714 386, 621 448, 525 487" marker-end="url(#arrow-rust)"></path>
+      </svg>
+      <div class="diagram-note">
+        <div class="callout">
+          External inputs on the left, processing stages in the middle, and stored outputs or persistent system state on the right.
+        </div>
+        <div class="callout">
+          The Pi still owns sensing, fusion, and coordinate math. The viewer consumes the accumulated point cloud buffer rather than recomputing the scan pipeline.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Logan Cooper · SUNY New Paltz Capstone Project · 2026</span>
+    <span>Handheld LiDAR Scanner System</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 9 – Conclusion & Lessons Learned
+     ══════════════════════════════════════════════════════ -->
+<div class="page dark">
+  <div class="header">
+    <div class="num">09</div>
+    <div class="title-block">
+      <h1>Conclusion &amp; Lessons Learned</h1>
+      <div class="sub">What was built, what was gained, and where it goes next</div>
+    </div>
+    <div class="badge">Conclusion</div>
+  </div>
+  <div class="body">
+    <div class="cols">
+      <div class="col">
+        <div class="card">
+          <h3>What Was Delivered</h3>
+          <ul>
+            <li>Fully wired handheld LiDAR scanner in a custom 3D printed housing</li>
+            <li>Python sensor stack with HAL interfaces and hardware mock support</li>
+            <li>ArUco camera pipeline for accurate scanner pose estimation</li>
+            <li>UDP sensor fusion stream combining LiDAR, IMU, and camera data</li>
+            <li>Unity point cloud viewer — validated end-to-end pipeline</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Key Lessons</h3>
+          <ul>
+            <li><strong>Test incrementally</strong> — isolate components first, integrate second</li>
+            <li><strong>Pivot strategically</strong> — when a camera driver blocked progress, shifting focus to Unity visualization kept the project moving forward</li>
+            <li><strong>Coordinate systems matter</strong> — every engine and sensor has its own axis; mapping them correctly is non-trivial</li>
+            <li><strong>Sensor fusion > single-source</strong> — combining IMU + ArUco produces far more stable results than either alone</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card">
+          <h3>Skills Developed</h3>
+          <ul>
+            <li>Embedded hardware integration (UART, I²C, GPIO)</li>
+            <li>Computer vision (camera calibration, ArUco detection)</li>
+            <li>3D math: quaternions, coordinate transforms, point clouds</li>
+            <li>Network programming (UDP socket design)</li>
+            <li>Game engine development (Unity C#)</li>
+            <li>CAD design and 3D printing</li>
+          </ul>
+        </div>
+        <div class="callout">
+          This project combined hardware, software, networking, computer vision, and 3D math into a single working pipeline — demonstrating what a computer science education looks like in practice.
+        </div>
+        <div class="card">
+          <h3>Future Directions</h3>
+          <ul>
+            <li>SLAM — simultaneous localization and mapping during movement</li>
+            <li>Point cloud export and mesh reconstruction</li>
+            <li>Smoothed sensor fusion with complementary or Kalman filtering</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Logan Cooper · SUNY New Paltz Capstone Project · 2026</span>
+    <span>Handheld LiDAR Scanner System</span>
+  </div>
+</div>
+
+</body>
+</html>

@@ -370,27 +370,74 @@ Sensor Read -> Orientation Fusion -> Point Transform -> UDP Packet -> Receiver A
 
 ---
 
-# How the Point Cloud Is Generated
+# System Diagram
 
-<div class="columns">
-<div>
+<div class="diagram-grid">
+<svg viewBox="0 0 1040 600" role="img" aria-label="LiDAR system data flow diagram">
+  <defs>
+    <marker id="arrow-showcase" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3f7bff"></path>
+    </marker>
+  </defs>
 
-1. Read a distance sample from the TF-Luna.
-2. Read the current orientation from the BNO055.
-3. Convert that sample into a 3D coordinate.
-4. Add the point to the current cloud.
-5. Render it with a custom shader and color mapping.
+  <rect class="entity" x="24" y="80" width="110" height="46" rx="10"></rect>
+  <text x="79" y="109" text-anchor="middle">Operator</text>
 
-</div>
-<div>
+  <rect class="entity" x="24" y="430" width="110" height="46" rx="10"></rect>
+  <text x="79" y="459" text-anchor="middle">Sensors</text>
 
-![height:260px](images/PointCloud_1.png)
+  <ellipse class="process" cx="395" cy="90" rx="120" ry="28"></ellipse>
+  <text x="395" y="96" text-anchor="middle">Scanner Control</text>
 
-</div>
+  <ellipse class="process" cx="395" cy="210" rx="132" ry="30"></ellipse>
+  <text x="395" y="216" text-anchor="middle">Sensor Read Process</text>
+
+  <ellipse class="process" cx="395" cy="346" rx="132" ry="30"></ellipse>
+  <text x="395" y="352" text-anchor="middle">Pose Fusion Process</text>
+
+  <ellipse class="process" cx="395" cy="492" rx="142" ry="30"></ellipse>
+  <text x="395" y="498" text-anchor="middle">Point Cloud Rendering</text>
+
+  <rect class="store-body" x="820" y="38" width="130" height="98" rx="2"></rect>
+  <ellipse class="store-top" cx="885" cy="38" rx="65" ry="18"></ellipse>
+  <ellipse class="store-top" cx="885" cy="136" rx="65" ry="18"></ellipse>
+  <text x="885" y="46" text-anchor="middle">Control State</text>
+
+  <rect class="store-body" x="780" y="168" width="170" height="130" rx="2"></rect>
+  <ellipse class="store-top" cx="865" cy="168" rx="85" ry="22"></ellipse>
+  <ellipse class="store-top" cx="865" cy="298" rx="85" ry="22"></ellipse>
+  <text x="865" y="175" text-anchor="middle">Raw Scan Samples</text>
+
+  <rect class="store-body" x="810" y="330" width="140" height="104" rx="2"></rect>
+  <ellipse class="store-top" cx="880" cy="330" rx="70" ry="19"></ellipse>
+  <ellipse class="store-top" cx="880" cy="434" rx="70" ry="19"></ellipse>
+  <text x="880" y="337" text-anchor="middle">Pose Records</text>
+
+  <rect class="store-body" x="790" y="466" width="160" height="112" rx="2"></rect>
+  <ellipse class="store-top" cx="870" cy="466" rx="80" ry="21"></ellipse>
+  <ellipse class="store-top" cx="870" cy="578" rx="80" ry="21"></ellipse>
+  <text x="870" y="473" text-anchor="middle">Point Cloud Buffer</text>
+
+  <path class="connector" d="M 134 103 C 205 103, 250 95, 276 92" marker-end="url(#arrow-showcase)"></path>
+  <path class="connector" d="M 134 103 C 205 115, 250 178, 263 205" marker-end="url(#arrow-showcase)"></path>
+  <path class="connector" d="M 134 103 C 205 145, 244 430, 252 486" marker-end="url(#arrow-showcase)"></path>
+
+  <path class="connector" d="M 134 453 C 205 453, 243 436, 257 358" marker-end="url(#arrow-showcase)"></path>
+  <path class="connector" d="M 134 453 C 215 453, 238 483, 251 492" marker-end="url(#arrow-showcase)"></path>
+
+  <path class="connector" d="M 515 90 C 635 90, 712 90, 820 64" marker-end="url(#arrow-showcase)"></path>
+  <path class="connector" d="M 527 210 C 637 210, 701 210, 780 233" marker-end="url(#arrow-showcase)"></path>
+  <path class="connector" d="M 527 346 C 636 346, 716 346, 810 382" marker-end="url(#arrow-showcase)"></path>
+  <path class="connector" d="M 537 492 C 634 492, 708 500, 790 520" marker-end="url(#arrow-showcase)"></path>
+
+  <path class="connector" d="M 820 120 C 714 130, 618 180, 515 205" marker-end="url(#arrow-showcase)"></path>
+  <path class="connector" d="M 790 520 C 708 512, 618 438, 515 358" marker-end="url(#arrow-showcase)"></path>
+  <path class="connector" d="M 810 382 C 714 386, 621 448, 525 487" marker-end="url(#arrow-showcase)"></path>
+</svg>
 </div>
 
 <div class="callout">
-The result is a continuously updated 3D point cloud that can be inspected in desktop and VR visualization environments.
+This version frames the project as a data-flow system: external inputs feed processing stages, which update stored scan state and the final point cloud buffer.
 </div>
 
 ---

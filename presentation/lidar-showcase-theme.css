@@ -220,6 +220,52 @@ section.section::after {
   margin-top: 14px;
 }
 
+.diagram-grid {
+  margin-top: 16px;
+}
+
+.diagram-grid svg {
+  width: 100%;
+  height: auto;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 12px 28px var(--shadow);
+}
+
+.diagram-grid .entity {
+  fill: #b7d6d8;
+  stroke: #3f7bff;
+  stroke-width: 2;
+}
+
+.diagram-grid .process {
+  fill: #81c9c7;
+  stroke: #3f7bff;
+  stroke-width: 2;
+}
+
+.diagram-grid .store-body,
+.diagram-grid .store-top {
+  fill: #f6a8b7;
+  stroke: #3f7bff;
+  stroke-width: 2;
+}
+
+.diagram-grid .connector {
+  fill: none;
+  stroke: #3f7bff;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.diagram-grid text {
+  fill: #1f4956;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  font-size: 17px;
+}
+
 .caption {
   color: var(--muted);
   font-size: 0.7em;
